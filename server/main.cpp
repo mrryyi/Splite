@@ -12,6 +12,8 @@
 
 #define SOCKET_BUFFER_SIZE 1024
 
+
+
 int main() {
     
     // We create a WSADATA object called wsaData.
@@ -79,7 +81,7 @@ int main() {
         buffer );
     }
 
-    /*//
+    /*
     SOCKADDR_IN server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons( PORT );
