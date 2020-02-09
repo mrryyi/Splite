@@ -64,18 +64,20 @@ int main() {
     server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
 
     char message[SOCKET_BUFFER_SIZE];
-    gets( message );
 
-    int flags = 0;
-    
-    printf("Enter message: ");
+    for(;;) {
+        gets( message );
 
-    if( sendto( sock, message, strlen( message ), flags, (SOCKADDR*)&server_address, sizeof( server_address ) ) == SOCKET_ERROR )
-    {
-        printf( "sendto failed: %d", WSAGetLastError() );
-        return 1;
+        int flags = 0;
+
+        printf("Enter message: ");
+
+        if( sendto( sock, message, strlen( message ), flags, (SOCKADDR*)&server_address, sizeof( server_address ) ) == SOCKET_ERROR )
+        {
+            printf( "sendto failed: %d", WSAGetLastError() );
+            return 1;
+        }
     }
-
 
     printf("hello.\n");
     return 1;

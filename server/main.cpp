@@ -11,6 +11,47 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 #define SOCKET_BUFFER_SIZE 1024
+#define ever ;;
+
+
+typedef struct ThreadData {
+    SOCKET* sock;
+} ;
+
+DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
+    
+
+    ThreadData& socket = *((ThreadData*)lpParameter);
+
+    char buffer[SOCKET_BUFFER_SIZE];
+    int flags = 0;
+    SOCKADDR_IN from;
+    int from_size = sizeof( from );
+    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+
+    for(ever) {
+        printf("Waiting for receive...\n");
+        if( bytes_received == SOCKET_ERROR )
+        {
+            printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+        }
+        else
+        {
+            buffer[bytes_received] = 0;
+            printf( "%d.%d.%d.%d:%d - %s", 
+            from.sin_addr.S_un.S_un_b.s_b1, 
+            from.sin_addr.S_un.S_un_b.s_b2, 
+            from.sin_addr.S_un.S_un_b.s_b3, 
+            from.sin_addr.S_un.S_un_b.s_b4, 
+            from.sin_port, 
+            buffer );
+        }
+    }
+
+    return 0;
+}
+
+void ErrorHandler(LPTSTR lpszFunction);
 
 
 
