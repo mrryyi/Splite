@@ -7,6 +7,7 @@
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <stdio.h>
+#include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -14,7 +15,62 @@
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
+typedef struct ThreadData {
+    SOCKET* sock;
+    int32_t is_running = 1;
+} ;
+
+DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
+    
+    ThreadData& threadData = *((ThreadData*)lpParam);
+
+    char recvbuffer[SOCKET_BUFFER_SIZE];
+    int flags = 0;
+    SOCKADDR_IN from;
+    int from_size = sizeof( from );
+    int bytes_received = 0;
+
+    int32_t player_x = 0;
+    int32_t player_y = 0;
+
+    int32_t is_running = 1;
+    while(is_running) {
+        
+        int bytes_received = recvfrom( *threadData.sock, recvbuffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+        
+        if( bytes_received == SOCKET_ERROR )
+        {
+            printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+            break;
+        }
+        else
+        {
+            recvbuffer[bytes_received] = 0;
+            // grab data from packet
+            int32_t read_index = 0;
+
+            memcpy( &player_x, &recvbuffer[read_index], sizeof( player_x ) );
+            read_index += sizeof( player_x );
+
+            memcpy( &player_y, &recvbuffer[read_index], sizeof( player_y ) );
+            read_index += sizeof( player_y );
+
+            memcpy( &is_running, &recvbuffer[read_index], sizeof( is_running ) );
+
+            threadData.is_running = is_running;
+
+            printf( "x:%d, y:%d, is_running:%d\n", player_x, player_y, is_running );
+        }
+    }
+
+    return 0;
+}
+
 int main() {
+
+    // Initialize ncurses in order to make getch() into a blocking function.
+    WINDOW *w;
+    w = initscr();
     
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
@@ -65,20 +121,31 @@ int main() {
 
     char message[SOCKET_BUFFER_SIZE];
 
-    for(;;) {
-        gets( message );
+    ThreadData threadData { &sock };
+    DWORD receiveThreadID;
+    HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
 
+    char buffer[SOCKET_BUFFER_SIZE];
+
+    while (threadData.is_running) {
+
+        // get input
+        buffer[0] = getchar();
+
+        // send to server
+        int buffer_length = 1;
         int flags = 0;
-
-        printf("Enter message: ");
-
-        if( sendto( sock, message, strlen( message ), flags, (SOCKADDR*)&server_address, sizeof( server_address ) ) == SOCKET_ERROR )
+        SOCKADDR* to = (SOCKADDR*)&server_address;
+        int to_length = sizeof( server_address );
+        if( sendto( sock, buffer, buffer_length, flags, to, to_length ) == SOCKET_ERROR )
         {
             printf( "sendto failed: %d", WSAGetLastError() );
-            return 1;
+            return 0;
         }
+        
     }
 
-    printf("hello.\n");
+    CloseHandle(receiveThreadHandle);
+
     return 1;
 }

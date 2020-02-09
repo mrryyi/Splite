@@ -13,7 +13,6 @@
 #define SOCKET_BUFFER_SIZE 1024
 #define ever ;;
 
-
 typedef struct ThreadData {
     SOCKET* sock;
 } ;
@@ -21,30 +20,84 @@ typedef struct ThreadData {
 DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     
 
-    ThreadData& socket = *((ThreadData*)lpParameter);
+    ThreadData& threadData = *((ThreadData*)lpParam);
 
-    char buffer[SOCKET_BUFFER_SIZE];
+    char recvBuffer[SOCKET_BUFFER_SIZE];
+    char sendBuffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
-    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+    int bytes_received = 0;
 
-    for(ever) {
-        printf("Waiting for receive...\n");
+    int32_t player_x = 0;
+    int32_t player_y = 0;
+
+    int32_t is_running = 1;
+
+    while(is_running) {
+        
+        int bytes_received = recvfrom( *threadData.sock, recvBuffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+        
         if( bytes_received == SOCKET_ERROR )
         {
             printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+            break;
         }
         else
         {
-            buffer[bytes_received] = 0;
+            recvBuffer[bytes_received] = 0;
             printf( "%d.%d.%d.%d:%d - %s", 
             from.sin_addr.S_un.S_un_b.s_b1, 
             from.sin_addr.S_un.S_un_b.s_b2, 
             from.sin_addr.S_un.S_un_b.s_b3, 
             from.sin_addr.S_un.S_un_b.s_b4, 
             from.sin_port, 
-            buffer );
+            recvBuffer );
+
+            char client_input = recvBuffer[0];
+
+            switch ( client_input ) {
+                case 'w':
+                    ++player_y;
+                    break;
+                case 'a':
+                    --player_x;
+                    break;
+                case 's':
+                    --player_y;
+                    break;
+                case 'd':
+                    ++player_x;
+                    break;
+                case 'q':
+                    is_running = 0;
+                    break;
+                default:
+                    printf("Unhandled client: %c\n", client_input);
+                    break;
+            }
+
+            int32_t write_index = 0;
+            memcpy( &sendBuffer[write_index], &player_x, sizeof( player_x ) );
+            write_index += sizeof( player_x );
+
+            memcpy( &sendBuffer[write_index], &player_y, sizeof( player_y ) );
+            write_index += sizeof( player_y );
+
+            memcpy (&sendBuffer[write_index], &is_running, sizeof( is_running ));
+
+            int bufferLength = sizeof( player_x ) + sizeof( player_y ) + sizeof( is_running );
+            flags = 0;
+
+            SOCKADDR* to = (SOCKADDR*)&from;
+            int toLength = sizeof( from );
+
+            if (sendto( *threadData.sock, sendBuffer, bufferLength, flags, to, toLength) == SOCKET_ERROR) {
+                printf( "sendto failed: %d", WSAGetLastError() );
+                return 1;
+            }
+
+
         }
     }
 
@@ -57,6 +110,9 @@ void ErrorHandler(LPTSTR lpszFunction);
 
 int main() {
     
+    // Forces stdout to be line-buffered.
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
 
@@ -99,44 +155,16 @@ int main() {
         return 1;
     }
 
-    char buffer[SOCKET_BUFFER_SIZE];
-    int flags = 0;
-    SOCKADDR_IN from;
-    int from_size = sizeof( from );
-    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+    ThreadData threadData { &sock };
+    DWORD receiveThreadID;
+    HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
 
-    printf("Waiting for receive...\n");
-    if( bytes_received == SOCKET_ERROR )
-    {
-        printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-    }
-    else
-    {
-        buffer[bytes_received] = 0;
-        printf( "%d.%d.%d.%d:%d - %s", 
-        from.sin_addr.S_un.S_un_b.s_b1, 
-        from.sin_addr.S_un.S_un_b.s_b2, 
-        from.sin_addr.S_un.S_un_b.s_b3, 
-        from.sin_addr.S_un.S_un_b.s_b4, 
-        from.sin_port, 
-        buffer );
-    }
+    char myChar = ' ';
+    while(myChar != 'q') {
+		myChar = getchar();
+	}
 
-    /*
-    SOCKADDR_IN server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons( PORT );
-    server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
+    CloseHandle(receiveThreadHandle);
 
-    char message[SOCKET_BUFFER_SIZE];
-    gets_s( message, SOCKET_BUFFER_SIZE );
-
-    int flags = 0;
-    if( sendto( sock, message, strlen( message ), flags, (SOCKADDR*)&server_address, sizeof( server_address ) ) == SOCKET_ERROR )
-    {
-        printf( "sendto failed: %d", WSAGetLastError() );
-        return;
-    }
-    */
     return 0;
 }
