@@ -1,10 +1,9 @@
-#include "..\common\pre.h"
-#include "..\common\types.h"
+#include "..\include\pre.h"
+#include "..\include\types.h"
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define SOCKET_BUFFER_SIZE 1024
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
@@ -23,7 +22,7 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     int from_size = sizeof( from );
     int bytes_received = 0;
 
-    int32_t type = -1;
+    int32_t message_type = -1;
     int32_t player_x = 0;
     int32_t player_y = 0;
 
@@ -44,8 +43,8 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
 
             int32_t read_index = 0;
 
-            memcpy( &type, &recvbuffer[read_index], sizeof( type ));
-            read_index += sizeof( type );
+            memcpy( &message_type, &recvbuffer[read_index], sizeof( message_type ));
+            read_index += sizeof( message_type );
 
             memcpy( &player_x, &recvbuffer[read_index], sizeof( player_x ) );
             read_index += sizeof( player_x );
@@ -57,7 +56,7 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
 
             threadData.is_running = is_running;
             
-            printf( "[Type: %s, x:%d, y:%d, is_running:%d]", MsgTypeName(type), player_x, player_y, is_running );
+            printf( "[Type: %s, x:%d, y:%d, is_running:%d]", MsgTypeName(message_type), player_x, player_y, is_running );
         }
     }
 
@@ -125,13 +124,24 @@ int main() {
 
     char buffer[SOCKET_BUFFER_SIZE];
 
+    int32_t write_index;
+    int32_t message_type = MSGTYPE_LEGACYPOSITION;
+    int32_t userInput;
     while (threadData.is_running) {
 
         // get input
-        buffer[0] = getchar();
+        userInput = getchar();
+
+        write_index = 0;
+        memcpy( &buffer[write_index], &message_type, sizeof( message_type ));
+        write_index += sizeof( message_type );
+
+        memcpy( &buffer[write_index], &userInput, sizeof( userInput ));
+        write_index += sizeof( userInput );
+
 
         // send to server
-        int buffer_length = 1;
+        int buffer_length = sizeof ( message_type ) + sizeof( userInput );
         int flags = 0;
         SOCKADDR* to = (SOCKADDR*)&server_address;
         int to_length = sizeof( server_address );

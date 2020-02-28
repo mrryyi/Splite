@@ -1,39 +1,11 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include "..\common\pre.h"
-#include "..\common\types.h"
+#include "..\include\pre.h"
+#include "..\include\types.h"
+#include "..\include\message.h"
 
 #pragma comment(lib, "Ws2_32.lib")
-
-#define SOCKET_BUFFER_SIZE 1024
-#define ever ;;
-
-class Message{
-public:
-    char buffer[SOCKET_BUFFER_SIZE];
-    int32_t SOCKADDR_IN_size;
-    int32_t flags = 0;
-    SOCKADDR_IN address;
-    int address_size;
-    int32_t bufferLength;
-    int bytesReceived = SOCKET_ERROR;
-
-    void SetAddress(SOCKADDR_IN address) {
-        this->address = address;
-        this->address_size = sizeof(address);
-    };
-
-    void PrintAddess() {
-        this->buffer[this->bytesReceived] = 0;
-        printf( "%d.%d.%d.%d:%d", 
-        this->address.sin_addr.S_un.S_un_b.s_b1, 
-        this->address.sin_addr.S_un.S_un_b.s_b2, 
-        this->address.sin_addr.S_un.S_un_b.s_b3, 
-        this->address.sin_addr.S_un.S_un_b.s_b4, 
-        this->address.sin_port);
-    };
-};
 
 namespace ConstructMessageContent {
     void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running){
@@ -122,7 +94,7 @@ public:
     };
 
     void HandleMessage(Message& r_Msg) {
-        r_Msg.PrintAddess();
+        r_Msg.PrintAddress();
 
         int32_t message_type = -1;
         int32_t message_type_index = 0;
