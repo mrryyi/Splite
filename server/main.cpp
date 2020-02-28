@@ -7,6 +7,7 @@
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <stdio.h>
+#include <thread>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -50,86 +51,89 @@ namespace ConstructMessageContent {
     };
 };
 
-DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
-    
-
-    ThreadData& threadData = *((ThreadData*)lpParam);
-
-    char recvBuffer[SOCKET_BUFFER_SIZE];
-    char sendBuffer[SOCKET_BUFFER_SIZE];
-    int flags = 0;
-    SOCKADDR_IN from;
-    int from_size = sizeof( from );
-    int bytes_received = 0;
-
+class Communication {
     int32_t player_x = 0;
     int32_t player_y = 0;
-
     int32_t is_running = 1;
 
-    Message message;
+    int32_t socket_set = 0;
+    SOCKET* socket;
+public:
+    Communication(SOCKET* s) {
+        socket = s;
+        socket_set = 1;
+    };
 
-    while(is_running) {
-        
-        int bytes_received = recvfrom( *threadData.sock, recvBuffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
-        
-        if( bytes_received == SOCKET_ERROR )
-        {
-            printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-            break;
-        }
-        else
-        {
-            recvBuffer[bytes_received] = 0;
-            printf( "%d.%d.%d.%d:%d - %s", 
-            from.sin_addr.S_un.S_un_b.s_b1, 
-            from.sin_addr.S_un.S_un_b.s_b2, 
-            from.sin_addr.S_un.S_un_b.s_b3, 
-            from.sin_addr.S_un.S_un_b.s_b4, 
-            from.sin_port, 
-            recvBuffer );
-
-            char client_input = recvBuffer[0];
-
-            switch ( client_input ) {
-                case 'w':
-                    ++player_y;
-                    break;
-                case 'a':
-                    --player_x;
-                    break;
-                case 's':
-                    --player_y;
-                    break;
-                case 'd':
-                    ++player_x;
-                    break;
-                case 'q':
-                    is_running = 0;
-                    break;
-                default:
-                    printf("Unhandled client: %c\n", client_input);
-                    break;
-            }
-
-            ConstructMessageContent::legacyPosition( message, player_x, player_y, is_running );
-            message.setAddress(from);
-            
-            if (sendto( *threadData.sock, message.buffer, message.bufferLength, message.flags, (SOCKADDR*)&message.address, message.addressSize ) == SOCKET_ERROR) {
-                printf( "sendto failed: %d", WSAGetLastError() );
-                return 1;
-            }
-
-
+    int32_t SocketSet(){ return socket_set; };
+    
+    void Send(Message& s_Msg){
+        if (sendto( *this->socket,
+                    s_Msg.buffer,
+                    s_Msg.bufferLength,
+                    s_Msg.flags,
+                    (SOCKADDR*)&s_Msg.address,
+                    s_Msg.addressSize) == SOCKET_ERROR) {
+            printf( "sendto failed: %d", WSAGetLastError() );
         }
     }
 
-    return 0;
-}
+    void HandleMessage(Message& r_Msg) {
+        r_Msg.buffer[r_Msg.bytesReceived] = 0;
+        printf( "%d.%d.%d.%d:%d - %s", 
+        r_Msg.address.sin_addr.S_un.S_un_b.s_b1, 
+        r_Msg.address.sin_addr.S_un.S_un_b.s_b2, 
+        r_Msg.address.sin_addr.S_un.S_un_b.s_b3, 
+        r_Msg.address.sin_addr.S_un.S_un_b.s_b4, 
+        r_Msg.address.sin_port, 
+        r_Msg.buffer );
 
-void ErrorHandler(LPTSTR lpszFunction);
+        char client_input = r_Msg.buffer[0];
 
+        switch ( client_input ) {
+            case 'w':
+                ++player_y;
+                break;
+            case 'a':
+                --player_x;
+                break;
+            case 's':
+                --player_y;
+                break;
+            case 'd':
+                ++player_x;
+                break;
+            case 'q':
+                is_running = 0;
+                break;
+            default:
+                printf("Unhandled client: %c\n", client_input);
+                break;
+        }
 
+        Message s_Msg;
+        ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
+        s_Msg.setAddress(r_Msg.address);
+        this->Send(s_Msg);
+    };
+
+    void ReceiveThread(){
+        while( is_running ) {
+            Message recvMsg;    
+            recvMsg.bytesReceived = recvfrom( *this->socket, recvMsg.buffer, SOCKET_BUFFER_SIZE, recvMsg.flags, (SOCKADDR*)&recvMsg.address, &recvMsg.addressSize );
+            
+            if( recvMsg.bytesReceived == SOCKET_ERROR )
+            {
+                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+                break;
+            }
+            else
+            {
+                HandleMessage(recvMsg);
+            }
+        }
+    };
+
+};
 
 int main() {
     
@@ -172,22 +176,27 @@ int main() {
     local_address.sin_family = AF_INET;
     local_address.sin_port = htons( 1234 );
     local_address.sin_addr.s_addr = INADDR_ANY;
+
     if( bind( sock, (SOCKADDR*)&local_address, sizeof( local_address ) ) == SOCKET_ERROR )
     {
         printf( "bind failed: %d", WSAGetLastError() );
         return 1;
     }
 
-    ThreadData threadData { &sock };
-    DWORD receiveThreadID;
-    HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
+    Communication* pCommunication = new Communication( &sock );
+    std::thread th(&Communication::ReceiveThread, pCommunication);
+
+    //ThreadData threadData { &sock };
+    //DWORD receiveThreadID;
+    //HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
 
     char myChar = ' ';
     while(myChar != 'q') {
 		myChar = getchar();
 	}
 
-    CloseHandle(receiveThreadHandle);
+    //CloseHandle(receiveThreadHandle);
 
+    delete pCommunication;
     return 0;
 }
