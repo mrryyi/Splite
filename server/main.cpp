@@ -1,13 +1,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
-#include <stdio.h>
-#include <thread>
+#include "..\common\pre.h"
+#include "..\common\types.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -36,8 +31,12 @@ public:
 
 namespace ConstructMessageContent {
     void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running){
-
+        int32_t type = MSGTYPE_LEGACYPOSITION;
         int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
         memcpy( &msg.buffer[write_index], &x, sizeof( x ) );
         write_index += sizeof( x );
 
@@ -46,7 +45,7 @@ namespace ConstructMessageContent {
 
         memcpy( &msg.buffer[write_index], &is_running, sizeof( is_running ));
 
-        msg.bufferLength = sizeof( x ) + sizeof( y ) + sizeof( is_running );
+        msg.bufferLength = sizeof( type ) + sizeof( x ) + sizeof( y ) + sizeof( is_running );
 
     };
 };
@@ -88,7 +87,8 @@ public:
         r_Msg.buffer );
 
         char client_input = r_Msg.buffer[0];
-
+        int32_t message_type;
+        
         switch ( client_input ) {
             case 'w':
                 ++player_y;
@@ -190,7 +190,7 @@ int main() {
     while(myChar != 'q') {
 		myChar = getchar();
 	}
-    
+
     delete pCommunication;
     return 0;
 }

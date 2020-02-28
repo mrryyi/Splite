@@ -1,12 +1,5 @@
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iphlpapi.h>
-#include <stdio.h>
+#include "..\common\pre.h"
+#include "..\common\types.h"
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -18,7 +11,7 @@
 typedef struct ThreadData {
     SOCKET* sock;
     int32_t is_running = 1;
-} ;
+};
 
 DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     
@@ -30,6 +23,7 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     int from_size = sizeof( from );
     int bytes_received = 0;
 
+    int32_t type = -1;
     int32_t player_x = 0;
     int32_t player_y = 0;
 
@@ -47,7 +41,11 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
         {
             recvbuffer[bytes_received] = 0;
             // grab data from packet
+
             int32_t read_index = 0;
+
+            memcpy( &type, &recvbuffer[read_index], sizeof( type ));
+            read_index += sizeof( type );
 
             memcpy( &player_x, &recvbuffer[read_index], sizeof( player_x ) );
             read_index += sizeof( player_x );
@@ -58,8 +56,8 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
             memcpy( &is_running, &recvbuffer[read_index], sizeof( is_running ) );
 
             threadData.is_running = is_running;
-
-            printf( "x:%d, y:%d, is_running:%d ", player_x, player_y, is_running );
+            
+            printf( "[Type: %s, x:%d, y:%d, is_running:%d]", MsgTypeName(type), player_x, player_y, is_running );
         }
     }
 
@@ -144,6 +142,8 @@ int main() {
         }
         
     }
+
+    printf("[Program exit: threadData.is_running:%d]", threadData.is_running);
 
     CloseHandle(receiveThreadHandle);
 
