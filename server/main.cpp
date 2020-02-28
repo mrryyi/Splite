@@ -133,7 +133,7 @@ public:
         }
     };
 
-};
+};  
 
 int main() {
     
@@ -186,17 +186,11 @@ int main() {
     Communication* pCommunication = new Communication( &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
-    //ThreadData threadData { &sock };
-    //DWORD receiveThreadID;
-    //HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
-
     char myChar = ' ';
     while(myChar != 'q') {
 		myChar = getchar();
 	}
-
-    //CloseHandle(receiveThreadHandle);
-
+    
     delete pCommunication;
     return 0;
 }
