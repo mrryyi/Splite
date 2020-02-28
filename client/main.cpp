@@ -59,7 +59,7 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
 
             threadData.is_running = is_running;
 
-            printf( "x:%d, y:%d, is_running:%d\n", player_x, player_y, is_running );
+            printf( "x:%d, y:%d, is_running:%d ", player_x, player_y, is_running );
         }
     }
 
