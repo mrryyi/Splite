@@ -15,7 +15,40 @@
 
 typedef struct ThreadData {
     SOCKET* sock;
-} ;
+};
+
+class Message{
+public:
+    char buffer[SOCKET_BUFFER_SIZE];
+    int32_t SOCKADDR_IN_size;
+    int32_t flags = 0;
+    SOCKADDR_IN address;
+    int addressSize;
+    int32_t bufferLength;
+    int bytesReceived = SOCKET_ERROR;
+
+    void setAddress(SOCKADDR_IN address) {
+        this->address = address;
+        this->addressSize = sizeof(address);
+    };
+};
+
+namespace ConstructMessageContent {
+    void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running){
+
+        int32_t write_index = 0;
+        memcpy( &msg.buffer[write_index], &x, sizeof( x ) );
+        write_index += sizeof( x );
+
+        memcpy( &msg.buffer[write_index], &y, sizeof( y ) );
+        write_index += sizeof( y );
+
+        memcpy( &msg.buffer[write_index], &is_running, sizeof( is_running ));
+
+        msg.bufferLength = sizeof( x ) + sizeof( y ) + sizeof( is_running );
+
+    };
+};
 
 DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     
@@ -33,6 +66,8 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
     int32_t player_y = 0;
 
     int32_t is_running = 1;
+
+    Message message;
 
     while(is_running) {
         
@@ -77,22 +112,10 @@ DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
                     break;
             }
 
-            int32_t write_index = 0;
-            memcpy( &sendBuffer[write_index], &player_x, sizeof( player_x ) );
-            write_index += sizeof( player_x );
-
-            memcpy( &sendBuffer[write_index], &player_y, sizeof( player_y ) );
-            write_index += sizeof( player_y );
-
-            memcpy (&sendBuffer[write_index], &is_running, sizeof( is_running ));
-
-            int bufferLength = sizeof( player_x ) + sizeof( player_y ) + sizeof( is_running );
-            flags = 0;
-
-            SOCKADDR* to = (SOCKADDR*)&from;
-            int toLength = sizeof( from );
-
-            if (sendto( *threadData.sock, sendBuffer, bufferLength, flags, to, toLength) == SOCKET_ERROR) {
+            ConstructMessageContent::legacyPosition( message, player_x, player_y, is_running );
+            message.setAddress(from);
+            
+            if (sendto( *threadData.sock, message.buffer, message.bufferLength, message.flags, (SOCKADDR*)&message.address, message.addressSize ) == SOCKET_ERROR) {
                 printf( "sendto failed: %d", WSAGetLastError() );
                 return 1;
             }
