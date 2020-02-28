@@ -9,23 +9,29 @@
 #define SOCKET_BUFFER_SIZE 1024
 #define ever ;;
 
-typedef struct ThreadData {
-    SOCKET* sock;
-};
-
 class Message{
 public:
     char buffer[SOCKET_BUFFER_SIZE];
     int32_t SOCKADDR_IN_size;
     int32_t flags = 0;
     SOCKADDR_IN address;
-    int addressSize;
+    int address_size;
     int32_t bufferLength;
     int bytesReceived = SOCKET_ERROR;
 
-    void setAddress(SOCKADDR_IN address) {
+    void SetAddress(SOCKADDR_IN address) {
         this->address = address;
-        this->addressSize = sizeof(address);
+        this->address_size = sizeof(address);
+    };
+
+    void PrintAddess() {
+        this->buffer[this->bytesReceived] = 0;
+        printf( "%d.%d.%d.%d:%d", 
+        this->address.sin_addr.S_un.S_un_b.s_b1, 
+        this->address.sin_addr.S_un.S_un_b.s_b2, 
+        this->address.sin_addr.S_un.S_un_b.s_b3, 
+        this->address.sin_addr.S_un.S_un_b.s_b4, 
+        this->address.sin_port);
     };
 };
 
@@ -71,24 +77,24 @@ public:
                     s_Msg.bufferLength,
                     s_Msg.flags,
                     (SOCKADDR*)&s_Msg.address,
-                    s_Msg.addressSize) == SOCKET_ERROR) {
+                    s_Msg.address_size) == SOCKET_ERROR) {
             printf( "sendto failed: %d", WSAGetLastError() );
         }
     }
 
-    void HandleMessage(Message& r_Msg) {
-        r_Msg.buffer[r_Msg.bytesReceived] = 0;
-        printf( "%d.%d.%d.%d:%d - %s", 
-        r_Msg.address.sin_addr.S_un.S_un_b.s_b1, 
-        r_Msg.address.sin_addr.S_un.S_un_b.s_b2, 
-        r_Msg.address.sin_addr.S_un.S_un_b.s_b3, 
-        r_Msg.address.sin_addr.S_un.S_un_b.s_b4, 
-        r_Msg.address.sin_port, 
-        r_Msg.buffer );
-
-        char client_input = r_Msg.buffer[0];
-        int32_t message_type;
+    void MessageLegacy(Message& r_Msg){
         
+        // Skip the MSGTYPE
+        int32_t read_index = 0;
+        int32_t message_type;
+        int32_t client_input;
+        
+        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
+        read_index += sizeof( message_type );
+
+        memcpy( &client_input, &r_Msg.buffer[read_index], sizeof( client_input ) );
+        read_index += sizeof( client_input );
+
         switch ( client_input ) {
             case 'w':
                 ++player_y;
@@ -109,17 +115,41 @@ public:
                 printf("Unhandled client: %c\n", client_input);
                 break;
         }
+    };
+
+    void MessageConnection(Message& r_Msg){
+
+    };
+
+    void HandleMessage(Message& r_Msg) {
+        r_Msg.PrintAddess();
+
+        int32_t message_type = -1;
+        int32_t message_type_index = 0;
+        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+
+        switch ( message_type )
+        {
+            case MSGTYPE_LEGACYPOSITION:
+                MessageLegacy(r_Msg);
+                break;
+            case MSGTYPE_CONNECTION:
+                MessageConnection(r_Msg);
+                break;
+            default:
+                printf("Unhandled message type.");
+        }
 
         Message s_Msg;
         ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
-        s_Msg.setAddress(r_Msg.address);
+        s_Msg.SetAddress(r_Msg.address);
         this->Send(s_Msg);
     };
 
     void ReceiveThread(){
         while( is_running ) {
             Message recvMsg;    
-            recvMsg.bytesReceived = recvfrom( *this->socket, recvMsg.buffer, SOCKET_BUFFER_SIZE, recvMsg.flags, (SOCKADDR*)&recvMsg.address, &recvMsg.addressSize );
+            recvMsg.bytesReceived = recvfrom( *this->socket, recvMsg.buffer, SOCKET_BUFFER_SIZE, recvMsg.flags, (SOCKADDR*)&recvMsg.address, &recvMsg.address_size );
             
             if( recvMsg.bytesReceived == SOCKET_ERROR )
             {
