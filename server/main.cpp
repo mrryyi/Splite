@@ -84,7 +84,7 @@ public:
                 is_running = 0;
                 break;
             default:
-                printf("Unhandled client: %c\n", client_input);
+                printf("Unhandled client: [%c]\n", client_input);
                 break;
         }
     };
