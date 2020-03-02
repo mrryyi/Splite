@@ -49,6 +49,26 @@ namespace ConstructMessageContent {
         msg.bufferLength = sizeof( type ) + sizeof( x ) + sizeof( y );
 
     };
+
+    void connectionCommand(Message& msg) {
+        int32_t type = MSGTYPE_CONNECTION;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
+        write_index += sizeof( type );
+
+        msg.bufferLength = sizeof( type );
+    }
+
+    void registrationAccepted(Message& msg) {
+        int32_t type = MSGTYPE_REGISTERACCEPTED;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
+        write_index += sizeof( type );
+
+        msg.bufferLength = sizeof( type );
+    }
 };
 
 class Communication {
@@ -164,6 +184,8 @@ class Client {
     int32_t player_y = 0;
     int32_t unique_id;
     int32_t address;
+    int32_t connected;
+    int64_t last_seen;
     
 public:
     Client(int32_t unique_id, int32_t address, int32_t player_x = 0, int32_t player_y = 0)
@@ -171,11 +193,17 @@ public:
     {};
     ~Client(){};
 
-    int32_t Set_player_x(int32_t new_x) {
-        player_x = new_x;
+    void Set_player_x(int32_t player_x) {
+        this->player_x = player_x;
     };
-    int32_t Set_player_y(int32_t new_y) {
-        player_y = new_y;
+    void Set_player_y(int32_t player_y) {
+        this->player_y = player_y;
+    };
+    void Set_connected(int32_t connected){
+        this->connected = connected;
+    };
+    void Set_last_seen(int32_t) {
+        this->last_seen = last_seen;
     };
 
     int32_t Get_player_x() {
@@ -190,17 +218,171 @@ public:
     int32_t Get_address() {
         return address;
     };
+    int32_t Get_connected() {
+        return connected;
+    };
+    int32_t Get_last_seen() {
+        return last_seen;
+    };
 };
 
-class ClientHandler {
+class ClientStore() {
+public:
+    std::map< int32_t, Client* > clients;
 
+    void AddNewClient( Client& new_client ) {
+        clients.insert( std::make_pair( new_client, new_client.Get_unique_id() ) );
+    }
 };
 
-class GameHandler {
+// Could probably be called something like connection handler.
+// ToDo: learn coding semantic guidelines.
+class ConnectionHandler {
+    int32_t max_clients;
+    ClientStore p_ClientStore;
+public:
+    ClientHandler(ClientStore* client_store, int32_t max_clients = 16) {
+        this->p_ClientStore = client_store;
+        this->max_clients = max_clients;
+    };
 
+    void ConnectionMessageHandler(Message& r_Msg){
+        // Find client unique ID, then update clients[unique ID]
+    }
+
+    void ConnectionThread(){
+        for(int i = 0; i < clients.size(); i++){
+            // if maxtimebetweenlastseen < client.lastseen
+            // then disconnected
+            // if timetocheck
+            // send a connection message
+        }
+    }
+
+    void AddNewClient() {
+        // Add new client to map of clients    
+    }
 };
 
-int main() {
+// Could be called something like GameLogic. Will be implemented.
+class GameLogicHandler {
+
+    ClientStore* p_clients = nullptr;
+
+public:
+    GameLogicHandler(ClientStore* clients){
+        p_clients = clients;
+    }
+
+    void MessageLegacy(Message& r_Msg){
+        
+        // Skip the MSGTYPE
+        int32_t read_index = 0;
+        int32_t message_type;
+        int32_t client_input;
+        
+        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
+        read_index += sizeof( message_type );
+
+        memcpy( &client_input, &r_Msg.buffer[read_index], sizeof( client_input ) );
+        read_index += sizeof( client_input );
+
+        switch ( client_input ) {
+            case 'w':
+                ++player_y;
+                break;
+            case 'a':
+                --player_x;
+                break;
+            case 's':
+                --player_y;
+                break;
+            case 'd':
+                ++player_x;
+                break;
+            case 'q':
+                is_running = 0;
+                break;
+            default:
+                printf("Unhandled client: %c\n", client_input);
+                break;
+        }
+    };
+};
+
+
+class MessageHandler {
+
+    void MessageBroker(Message& r_Msg) {
+
+        int32_t message_type = -1;
+        int32_t message_type_index = 0;
+        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+
+        switch ( message_type )
+        {
+            case MSGTYPE_LEGACYPOSITION:
+                this->pGameLogicHandler.LegacyPositionMessageHandler(r_Msg);
+                break;
+            case MSGTYPE_CONNECTION:
+                this->pConnectionHandler.ConnectionMessageHandler(r_Msg);
+                break;
+            default:
+                printf("Unhandled message type.");
+        }
+    };
+
+    bool thread_is_running = false;
+
+public:
+    ConnectionHandler* pConnectionHandler = nullptr;
+    GameLogicHandler* pGameLogicHandler = nullptr;
+    SOCKET* pSocket = nullptr;
+
+    MessageHandler(SOCKET* socket, ConnectionHandler* connection_handler, GameLogicHandler* game_logic_handler) {
+        this->pSocket = socket;
+        this->pConnectionHandler = connection_handler;
+        this->pGameLogicHandler = game_logic_handler;
+    }
+
+    bool ValidReferences(){
+        if (pConnectionHandler != nullptr &&
+            pGameLogicHandler != nullptr &&
+            pSocket != nullptr)
+        {
+            return true;
+        }
+        else {
+            return false;
+        }
+    };
+
+    void ReceiveThread() {
+
+        if ( this->ValidReferences ) {
+            for( ever ) {
+                Message r_Msg;    
+                r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+                
+                if( r_Msg.bytesReceived == SOCKET_ERROR )
+                {
+                    printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+                    break;
+                }
+                else
+                {
+                    std::thread th(&MessageHandler::UnderstandMessage, this);
+                    this->MessageBroker( r_Msg );
+                }
+            }
+        }
+        else {
+            printf("ReceiveThread Error: Invalid references.");
+        }
+    };
+};
+
+int main(int argc, char *argv[]) {
     
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -248,8 +430,17 @@ int main() {
         return 1;
     }
 
-    Communication* pCommunication = new Communication( &sock );
-    std::thread th(&Communication::ReceiveThread, pCommunication);
+    //Communication* pCommunication = new Communication( &sock );
+    //std::thread commThread(&Communication::ReceiveThread, pCommunication);
+
+    ClientStore*       pClientStore = new ClientStore( 20 );
+    ConnectionHandler* pConnectionHandler = new ConnectionHandler( pClientStore );
+    GameLogicHandler*  pGameLogicHandler = GameLogicHandler( pClientStore );
+    MessageHandler*    pMessageHandler = new MessageHandler( &sock, pGameLogicHandler, pConnectionHandler );
+
+    pMessageHandler->connection_handler = pGameLogicHandler;
+
+    std::thread message_handler_thread(&MessageHandler::ReceiveThread, pMessageHandler);
 
     char myChar = ' ';
     while(myChar != 'q') {
@@ -258,6 +449,10 @@ int main() {
     
     printf("Exiting program normally...");
 
-    delete pCommunication;
+    delete pConnectionHandler;
+    delete pClientStore;
+    delete pGameLogicHandler;
+    delete pMessageHandler;
+    
     return 0;
 }

@@ -7,6 +7,8 @@
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
+bool connected = false;
+
 class Message {
 public:
     char buffer[SOCKET_BUFFER_SIZE];
@@ -38,7 +40,7 @@ namespace ConstructMessageContent {
         int32_t type = MSGTYPE_LEGACYPOSITION;
         int32_t write_index = 0;
 
-        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
         write_index += sizeof( type );
 
         memcpy( &msg.buffer[write_index], &direction, sizeof( direction ) );
@@ -46,6 +48,26 @@ namespace ConstructMessageContent {
 
         msg.bufferLength = sizeof( type ) + sizeof( direction );
     };
+
+    void registrationRequest(Message& msg){
+        int32_t type = MSGTYPE_REGISTERREQUEST;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
+        write_index += sizeof( type );
+
+        msg.bufferLength = sizeof( type );
+    }
+    
+    void connectionReply(Message& msg){
+        int32_t type = MSGTYPE_CONNECTION;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
+        write_index += sizeof( type );
+
+        msg.bufferLength = sizeof( type );
+    }
 };
 
 class Communication {
@@ -106,6 +128,8 @@ public:
             case MSGTYPE_CONNECTION:
                 MessageConnection(r_Msg);
                 break;
+            case MSGTYPE_REGISTERACCEPTED:
+                connected = true;
             default:
                 printf("Unhandled message type.");
         }
@@ -188,6 +212,15 @@ int main() {
 
     Communication* pCommunication = new Communication( &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
+
+
+    Message reg_Msg;
+    reg_Msg.SetAddress(server_address);
+    ConstructMessageContent::connectionRequest(reg_Msg);
+    while ( !connected ) {
+        pCommunication->Send(s_Msg);
+        Sleep(1000);
+    }
 
     for(ever) {
 
