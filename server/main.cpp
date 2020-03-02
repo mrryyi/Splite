@@ -1,13 +1,10 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include "..\common\pre.h"
-#include "..\common\types.h"
+#include "..\include\pre.h"
+#include "..\include\types.h"
 
 #pragma comment(lib, "Ws2_32.lib")
-
-#define SOCKET_BUFFER_SIZE 1024
-#define ever ;;
 
 class Message{
 public:
@@ -49,9 +46,7 @@ namespace ConstructMessageContent {
         memcpy( &msg.buffer[write_index], &y, sizeof( y ) );
         write_index += sizeof( y );
 
-        memcpy( &msg.buffer[write_index], &is_running, sizeof( is_running ));
-
-        msg.bufferLength = sizeof( type ) + sizeof( x ) + sizeof( y ) + sizeof( is_running );
+        msg.bufferLength = sizeof( type ) + sizeof( x ) + sizeof( y );
 
     };
 };
@@ -148,17 +143,17 @@ public:
 
     void ReceiveThread(){
         while( is_running ) {
-            Message recvMsg;    
-            recvMsg.bytesReceived = recvfrom( *this->socket, recvMsg.buffer, SOCKET_BUFFER_SIZE, recvMsg.flags, (SOCKADDR*)&recvMsg.address, &recvMsg.address_size );
+            Message r_Msg;    
+            r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
-            if( recvMsg.bytesReceived == SOCKET_ERROR )
+            if( r_Msg.bytesReceived == SOCKET_ERROR )
             {
                 printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
                 break;
             }
             else
             {
-                HandleMessage(recvMsg);
+                HandleMessage( r_Msg);
             }
         }
     };
@@ -220,6 +215,8 @@ int main() {
     while(myChar != 'q') {
 		myChar = getchar();
 	}
+    
+    printf("Exiting program normally...");
 
     delete pCommunication;
     return 0;

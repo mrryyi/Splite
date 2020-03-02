@@ -1,3 +1,4 @@
+#pragma once
 //
 // Message types
 //
@@ -6,7 +7,7 @@
 
 //https://stackoverflow.com/a/34321463
 const char* MsgTypeName(int value) {
-#define NAME(ERR) case ERR: return #ERR;
+#define NAME(TYPE) case TYPE: return #TYPE;
     switch (value) {
         NAME(MSGTYPE_LEGACYPOSITION)
         NAME(MSGTYPE_CONNECTION)

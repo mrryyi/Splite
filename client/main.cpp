@@ -1,68 +1,133 @@
-#include "..\common\pre.h"
-#include "..\common\types.h"
+#include "..\include\pre.h"
+#include "..\include\types.h"
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define SOCKET_BUFFER_SIZE 1024
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
-typedef struct ThreadData {
-    SOCKET* sock;
-    int32_t is_running = 1;
+class Message {
+public:
+    char buffer[SOCKET_BUFFER_SIZE];
+    int32_t SOCKADDR_IN_size;
+    int32_t flags = 0;
+    SOCKADDR_IN address;
+    int address_size;
+    int32_t bufferLength;
+    int bytesReceived = SOCKET_ERROR;
+
+    void SetAddress(SOCKADDR_IN address) {
+        this->address = address;
+        this->address_size = sizeof(address);
+    };
+
+    void PrintAddess() {
+        this->buffer[this->bytesReceived] = 0;
+        printf( "%d.%d.%d.%d:%d", 
+        this->address.sin_addr.S_un.S_un_b.s_b1, 
+        this->address.sin_addr.S_un.S_un_b.s_b2, 
+        this->address.sin_addr.S_un.S_un_b.s_b3, 
+        this->address.sin_addr.S_un.S_un_b.s_b4, 
+        this->address.sin_port);
+    };
 };
 
-DWORD WINAPI receiveThread( _Inout_ LPVOID lpParam) {
-    
-    ThreadData& threadData = *((ThreadData*)lpParam);
+namespace ConstructMessageContent {
+    void legacyPosition(Message& msg, int32_t direction){
+        int32_t type = MSGTYPE_LEGACYPOSITION;
+        int32_t write_index = 0;
 
-    char recvbuffer[SOCKET_BUFFER_SIZE];
-    int flags = 0;
-    SOCKADDR_IN from;
-    int from_size = sizeof( from );
-    int bytes_received = 0;
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
 
-    int32_t type = -1;
-    int32_t player_x = 0;
-    int32_t player_y = 0;
+        memcpy( &msg.buffer[write_index], &direction, sizeof( direction ) );
+        write_index += sizeof( direction );
 
-    int32_t is_running = 1;
-    while(is_running) {
-        
-        int bytes_received = recvfrom( *threadData.sock, recvbuffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
-        
-        if( bytes_received == SOCKET_ERROR )
-        {
-            printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-            break;
+        msg.bufferLength = sizeof( type ) + sizeof( direction );
+    };
+};
+
+class Communication {
+    SOCKET* socket;
+    int32_t socket_set = 0;
+public:
+    Communication(SOCKET* s) {
+        socket = s;
+        socket_set = 1;
+    };
+
+    void Send(Message& s_Msg){
+        if (sendto( *this->socket,
+                    s_Msg.buffer,
+                    s_Msg.bufferLength,
+                    s_Msg.flags,
+                    (SOCKADDR*)&s_Msg.address,
+                    s_Msg.address_size) == SOCKET_ERROR) {
+            printf( "sendto failed: %d", WSAGetLastError() );
         }
-        else
-        {
-            recvbuffer[bytes_received] = 0;
-            // grab data from packet
+    };
 
-            int32_t read_index = 0;
+    void MessageLegacy(Message& r_Msg) {
+        // grab data from packet
+        int32_t type;
+        int32_t player_x;
+        int32_t player_y;
+        int32_t read_index = 0;
 
-            memcpy( &type, &recvbuffer[read_index], sizeof( type ));
-            read_index += sizeof( type );
+        memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
+        read_index += sizeof( type );
 
-            memcpy( &player_x, &recvbuffer[read_index], sizeof( player_x ) );
-            read_index += sizeof( player_x );
+        memcpy( &player_x, &r_Msg.buffer[read_index], sizeof( player_x ) );
+        read_index += sizeof( player_x );
 
-            memcpy( &player_y, &recvbuffer[read_index], sizeof( player_y ) );
-            read_index += sizeof( player_y );
+        memcpy( &player_y, &r_Msg.buffer[read_index], sizeof( player_y ) );
+        read_index += sizeof( player_y );
 
-            memcpy( &is_running, &recvbuffer[read_index], sizeof( is_running ) );
+        printf("[messageType: %s, x: %d, y: %d]", MsgTypeName(type), player_x, player_y);
+    };
 
-            threadData.is_running = is_running;
-            
-            printf( "[Type: %s, x:%d, y:%d, is_running:%d]", MsgTypeName(type), player_x, player_y, is_running );
-        }
+    void MessageConnection(Message& r_Msg){
+
     }
 
-    return 0;
-}
+    void HandleMessage(Message& r_Msg) {
+        r_Msg.PrintAddess();
+
+        int32_t message_type = -1;
+        int32_t message_type_index = 0;
+        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+
+        switch ( message_type )
+        {
+            case MSGTYPE_LEGACYPOSITION:
+                MessageLegacy(r_Msg);
+                break;
+            case MSGTYPE_CONNECTION:
+                MessageConnection(r_Msg);
+                break;
+            default:
+                printf("Unhandled message type.");
+        }
+    };
+
+    void ReceiveThread(){
+        for(ever) {
+            Message r_Msg;    
+            r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            
+            if( r_Msg.bytesReceived == SOCKET_ERROR )
+            {
+                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+                break;
+            }
+            else
+            {
+                HandleMessage( r_Msg );
+            }
+        }
+    };
+};
 
 int main() {
 
@@ -117,35 +182,26 @@ int main() {
     server_address.sin_port = htons( PORT_SERVER );
     server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
 
-    char message[SOCKET_BUFFER_SIZE];
+    int32_t write_index;
+    int32_t message_type = MSGTYPE_LEGACYPOSITION;
+    int32_t userInput;
 
-    ThreadData threadData { &sock };
-    DWORD receiveThreadID;
-    HANDLE receiveThreadHandle = CreateThread(0, 0, receiveThread, &threadData, 0, &receiveThreadID);
+    Communication* pCommunication = new Communication( &sock );
+    std::thread th(&Communication::ReceiveThread, pCommunication);
 
-    char buffer[SOCKET_BUFFER_SIZE];
-
-    while (threadData.is_running) {
+    for(ever) {
 
         // get input
-        buffer[0] = getchar();
+        userInput = getchar();
 
-        // send to server
-        int buffer_length = 1;
-        int flags = 0;
-        SOCKADDR* to = (SOCKADDR*)&server_address;
-        int to_length = sizeof( server_address );
-        if( sendto( sock, buffer, buffer_length, flags, to, to_length ) == SOCKET_ERROR )
-        {
-            printf( "sendto failed: %d", WSAGetLastError() );
-            return 0;
-        }
-        
+        Message s_Msg;
+        ConstructMessageContent::legacyPosition(s_Msg, userInput);
+        s_Msg.SetAddress(server_address);
+        pCommunication->Send(s_Msg);
     }
 
-    printf("[Program exit: threadData.is_running:%d]", threadData.is_running);
+    printf("Exiting program normally...");
 
-    CloseHandle(receiveThreadHandle);
-
-    return 1;
+    delete pCommunication;
+    return 0;
 }
