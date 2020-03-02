@@ -6,7 +6,7 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-class Message{
+class Message {
 public:
     char buffer[SOCKET_BUFFER_SIZE];
     int32_t SOCKADDR_IN_size;
@@ -157,8 +157,48 @@ public:
             }
         }
     };
+};
 
-};  
+class Client {
+    int32_t player_x = 0;
+    int32_t player_y = 0;
+    int32_t unique_id;
+    int32_t address;
+    
+public:
+    Client(int32_t unique_id, int32_t address, int32_t player_x = 0, int32_t player_y = 0)
+    : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
+    {};
+    ~Client(){};
+
+    int32_t Set_player_x(int32_t new_x) {
+        player_x = new_x;
+    };
+    int32_t Set_player_y(int32_t new_y) {
+        player_y = new_y;
+    };
+
+    int32_t Get_player_x() {
+        return player_x;
+    };
+    int32_t Get_player_y() {
+        return player_y;
+    };
+    int32_t Get_unique_id() {
+        return unique_id;
+    };
+    int32_t Get_address() {
+        return address;
+    };
+};
+
+class ClientHandler {
+
+};
+
+class GameHandler {
+
+};
 
 int main() {
     
