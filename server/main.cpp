@@ -56,6 +56,19 @@ namespace ConstructMessageContent {
         msg.bufferLength = sizeof( type ) + sizeof( x ) + sizeof( y );
 
     };
+
+    void registerAccept(Message& msg, int32_t id) {
+        int32_t type = MSGTYPE_REGISTERACCEPT;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
+        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
+        write_index += sizeof( id );
+
+        msg.bufferLength = sizeof( type ) + sizeof( id );
+    }
 };
 
 class Sender {
@@ -130,8 +143,15 @@ public:
         this->pSender->Send(s_Msg);
     };
 
-    void MessageConnection(Message& r_Msg){
+    void MessageConnection(Message& r_Msg) {
 
+    };
+
+    void MessageRegisterRequest(Message& r_Msg) {
+        Message s_Msg;
+        ConstructMessageContent::registerAccept( s_Msg, 1337);
+        s_Msg.SetAddress(r_Msg.address);
+        this->pSender->Send(s_Msg);
     };
 
     void HandleMessage(Message& r_Msg) {
@@ -148,6 +168,9 @@ public:
                 break;
             case MSGTYPE_CONNECTION:
                 MessageConnection(r_Msg);
+                break;
+            case MSGTYPE_REGISTERREQUEST:
+                MessageRegisterRequest(r_Msg);
                 break;
             default:
                 printf("Unhandled message type.");
