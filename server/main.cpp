@@ -4,7 +4,14 @@
 #include "..\include\pre.h"
 #include "..\include\types.h"
 
+#include <map>
+
 #pragma comment(lib, "Ws2_32.lib")
+
+uint64_t timeSinceEpochMillisec() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
 
 class Message {
 public:
@@ -51,21 +58,13 @@ namespace ConstructMessageContent {
     };
 };
 
-class Communication {
-    int32_t player_x = 0;
-    int32_t player_y = 0;
-    int32_t is_running = 1;
-
-    int32_t socket_set = 0;
-    SOCKET* socket;
+class Sender {
 public:
-    Communication(SOCKET* s) {
-        socket = s;
-        socket_set = 1;
-    };
+    SOCKET* socket;
+    Sender(SOCKET* s){
+        this->socket = s;
+    }
 
-    int32_t SocketSet(){ return socket_set; };
-    
     void Send(Message& s_Msg){
         if (sendto( *this->socket,
                     s_Msg.buffer,
@@ -76,6 +75,20 @@ public:
             printf( "sendto failed: %d", WSAGetLastError() );
         }
     }
+};
+
+class Communication {
+    int32_t player_x = 0;
+    int32_t player_y = 0;
+    int32_t is_running = 1;
+
+    Sender* pSender;
+    SOCKET* pSocket;
+public:
+    Communication(Sender* sender, SOCKET* socket) {
+        this->pSender = sender;
+        this->pSocket = socket;
+    };
 
     void MessageLegacy(Message& r_Msg){
         
@@ -110,6 +123,11 @@ public:
                 printf("Unhandled client: %c\n", client_input);
                 break;
         }
+
+        Message s_Msg;
+        ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
+        s_Msg.SetAddress(r_Msg.address);
+        this->pSender->Send(s_Msg);
     };
 
     void MessageConnection(Message& r_Msg){
@@ -135,16 +153,13 @@ public:
                 printf("Unhandled message type.");
         }
 
-        Message s_Msg;
-        ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
-        s_Msg.SetAddress(r_Msg.address);
-        this->Send(s_Msg);
+        
     };
 
     void ReceiveThread(){
         while( is_running ) {
             Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            r_Msg.bytesReceived = recvfrom( *this->pSocket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if( r_Msg.bytesReceived == SOCKET_ERROR )
             {
@@ -163,10 +178,10 @@ class Client {
     int32_t player_x = 0;
     int32_t player_y = 0;
     int32_t unique_id;
-    int32_t address;
+    SOCKADDR_IN address;
     
 public:
-    Client(int32_t unique_id, int32_t address, int32_t player_x = 0, int32_t player_y = 0)
+    Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
     : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
     {};
     ~Client(){};
@@ -187,13 +202,17 @@ public:
     int32_t Get_unique_id() {
         return unique_id;
     };
-    int32_t Get_address() {
+    SOCKADDR_IN Get_address() {
         return address;
     };
 };
 
 class ClientHandler {
+public:
+    std::map<int32_t, Client*> clients;
+    ClientHandler() {
 
+    }
 };
 
 class GameHandler {
@@ -248,7 +267,8 @@ int main() {
         return 1;
     }
 
-    Communication* pCommunication = new Communication( &sock );
+    Sender* pSender = new Sender( &sock );
+    Communication* pCommunication = new Communication( pSender, &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
     char myChar = ' ';
