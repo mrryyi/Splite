@@ -9,6 +9,15 @@
 
 bool connected = false;
 
+void printAddress(SOCKADDR_IN address) {
+    printf( "%d.%d.%d.%d:%d", 
+    address.sin_addr.S_un.S_un_b.s_b1, 
+    address.sin_addr.S_un.S_un_b.s_b2, 
+    address.sin_addr.S_un.S_un_b.s_b3, 
+    address.sin_addr.S_un.S_un_b.s_b4, 
+    address.sin_port);
+};
+
 class Message {
 public:
     char buffer[SOCKET_BUFFER_SIZE];
@@ -24,7 +33,7 @@ public:
         this->address_size = sizeof(address);
     };
 
-    void PrintAddess() {
+    void PrintAddress() {
         this->buffer[this->bytesReceived] = 0;
         printf( "%d.%d.%d.%d:%d", 
         this->address.sin_addr.S_un.S_un_b.s_b1, 
@@ -59,20 +68,24 @@ namespace ConstructMessageContent {
         msg.bufferLength = sizeof( type );
     }
     
-    void connectionReply(Message& msg){
+    void connectionReply(Message& msg, int32_t id){
         int32_t type = MSGTYPE_CONNECTION;
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
         write_index += sizeof( type );
 
-        msg.bufferLength = sizeof( type );
+        memcpy( &msg.buffer[write_index], &id, sizeof( id ) );
+        write_index += sizeof( id );
+
+        msg.bufferLength = sizeof( type ) + sizeof( id );
     }
 };
 
 class Communication {
     SOCKET* socket;
     int32_t socket_set = 0;
+    int32_t unique_id_from_server = -1;
 public:
     Communication(SOCKET* s) {
         socket = s;
@@ -110,11 +123,29 @@ public:
     };
 
     void MessageConnection(Message& r_Msg){
+        if (unique_id_from_server != -1) {
+            Message s_Msg;
+            s_Msg.address = r_Msg.address;
+            ConstructMessageContent::connectionReply(s_Msg, unique_id_from_server);
+        }
+        else {
+            printf("Error: Tried replying without having a unique ID from server...");
+        }
+    }
 
+    void MessageAccepted(Message& r_Msg) {
+        connected = true;
+        int32_t type;
+        int32_t read_index = 0;
+
+        memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
+        read_index += sizeof( type );
+
+        memcpy( &unique_id_from_server, &r_Msg.buffer[read_index], sizeof( unique_id_from_server ));   
     }
 
     void HandleMessage(Message& r_Msg) {
-        r_Msg.PrintAddess();
+        r_Msg.PrintAddress();
 
         int32_t message_type = -1;
         int32_t message_type_index = 0;
@@ -129,9 +160,11 @@ public:
                 MessageConnection(r_Msg);
                 break;
             case MSGTYPE_REGISTERACCEPTED:
-                connected = true;
+                MessageAccepted(r_Msg);
             default:
-                printf("Unhandled message type.");
+                printf("Unhandled message type [%d]", MsgTypeName(message_type));
+                printf("From: ");
+                printAddress(r_Msg.address);    
         }
     };
 
@@ -216,11 +249,14 @@ int main() {
 
     Message reg_Msg;
     reg_Msg.SetAddress(server_address);
-    ConstructMessageContent::connectionRequest(reg_Msg);
+    ConstructMessageContent::registrationRequest(reg_Msg);
     while ( !connected ) {
-        pCommunication->Send(s_Msg);
+        printf("Sending request");
+        pCommunication->Send(reg_Msg);
         Sleep(1000);
     }
+
+    printf("Connected.");
 
     for(ever) {
 

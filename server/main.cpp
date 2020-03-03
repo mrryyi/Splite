@@ -4,7 +4,23 @@
 #include "..\include\pre.h"
 #include "..\include\types.h"
 
+#include <map>
+
 #pragma comment(lib, "Ws2_32.lib")
+
+uint64_t timeSinceEpochMillisec() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+void printAddress(SOCKADDR_IN address) {
+    printf( "%d.%d.%d.%d:%d", 
+    address.sin_addr.S_un.S_un_b.s_b1, 
+    address.sin_addr.S_un.S_un_b.s_b2, 
+    address.sin_addr.S_un.S_un_b.s_b3, 
+    address.sin_addr.S_un.S_un_b.s_b4, 
+    address.sin_port);
+};
 
 class Message {
 public:
@@ -21,8 +37,7 @@ public:
         this->address_size = sizeof(address);
     };
 
-    void PrintAddess() {
-        this->buffer[this->bytesReceived] = 0;
+    void PrintAddress() {
         printf( "%d.%d.%d.%d:%d", 
         this->address.sin_addr.S_un.S_un_b.s_b1, 
         this->address.sin_addr.S_un.S_un_b.s_b2, 
@@ -50,7 +65,7 @@ namespace ConstructMessageContent {
 
     };
 
-    void connectionCommand(Message& msg) {
+    void requestConnection(Message& msg) {
         int32_t type = MSGTYPE_CONNECTION;
         int32_t write_index = 0;
 
@@ -58,20 +73,22 @@ namespace ConstructMessageContent {
         write_index += sizeof( type );
 
         msg.bufferLength = sizeof( type );
-    }
+    };
 
-    void registrationAccepted(Message& msg) {
+    void registrationAccepted(Message& msg, int32_t unique_id) {
         int32_t type = MSGTYPE_REGISTERACCEPTED;
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ) );
         write_index += sizeof( type );
 
-        msg.bufferLength = sizeof( type );
-    }
+        memcpy( &msg.buffer[write_index], &unique_id, sizeof( unique_id ));
+
+        msg.bufferLength = sizeof( type ) + sizeof ( unique_id );
+    };
 };
 
-class Communication {
+class Sender {
     int32_t player_x = 0;
     int32_t player_y = 0;
     int32_t is_running = 1;
@@ -79,14 +96,14 @@ class Communication {
     int32_t socket_set = 0;
     SOCKET* socket;
 public:
-    Communication(SOCKET* s) {
+    Sender(SOCKET* s) {
         socket = s;
         socket_set = 1;
     };
 
-    int32_t SocketSet(){ return socket_set; };
+    int32_t SocketSet() { return socket_set; };
     
-    void Send(Message& s_Msg){
+    void Send(const Message& s_Msg){
         if (sendto( *this->socket,
                     s_Msg.buffer,
                     s_Msg.bufferLength,
@@ -96,102 +113,23 @@ public:
             printf( "sendto failed: %d", WSAGetLastError() );
         }
     }
-
-    void MessageLegacy(Message& r_Msg){
-        
-        // Skip the MSGTYPE
-        int32_t read_index = 0;
-        int32_t message_type;
-        int32_t client_input;
-        
-        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
-        read_index += sizeof( message_type );
-
-        memcpy( &client_input, &r_Msg.buffer[read_index], sizeof( client_input ) );
-        read_index += sizeof( client_input );
-
-        switch ( client_input ) {
-            case 'w':
-                ++player_y;
-                break;
-            case 'a':
-                --player_x;
-                break;
-            case 's':
-                --player_y;
-                break;
-            case 'd':
-                ++player_x;
-                break;
-            case 'q':
-                is_running = 0;
-                break;
-            default:
-                printf("Unhandled client: %c\n", client_input);
-                break;
-        }
-    };
-
-    void MessageConnection(Message& r_Msg){
-
-    };
-
-    void HandleMessage(Message& r_Msg) {
-        r_Msg.PrintAddess();
-
-        int32_t message_type = -1;
-        int32_t message_type_index = 0;
-        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
-
-        switch ( message_type )
-        {
-            case MSGTYPE_LEGACYPOSITION:
-                MessageLegacy(r_Msg);
-                break;
-            case MSGTYPE_CONNECTION:
-                MessageConnection(r_Msg);
-                break;
-            default:
-                printf("Unhandled message type.");
-        }
-
-        Message s_Msg;
-        ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
-        s_Msg.SetAddress(r_Msg.address);
-        this->Send(s_Msg);
-    };
-
-    void ReceiveThread(){
-        while( is_running ) {
-            Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-            
-            if( r_Msg.bytesReceived == SOCKET_ERROR )
-            {
-                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-                break;
-            }
-            else
-            {
-                HandleMessage( r_Msg);
-            }
-        }
-    };
 };
 
 class Client {
     int32_t player_x = 0;
     int32_t player_y = 0;
-    int32_t unique_id;
-    int32_t address;
     int32_t connected;
-    int64_t last_seen;
+    uint64_t last_seen_ms;
+    uint64_t last_asked_ms;
     
+    int32_t unique_id;
+    SOCKADDR_IN address;
 public:
-    Client(int32_t unique_id, int32_t address, int32_t player_x = 0, int32_t player_y = 0)
+    Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
     : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
     {};
     ~Client(){};
+
 
     void Set_player_x(int32_t player_x) {
         this->player_x = player_x;
@@ -202,9 +140,12 @@ public:
     void Set_connected(int32_t connected){
         this->connected = connected;
     };
-    void Set_last_seen(int32_t) {
-        this->last_seen = last_seen;
+    void Set_last_seen_ms(uint64_t last_seen) {
+        this->last_seen_ms = last_seen;
     };
+    void Set_last_asked_ms(uint64_t last_asked) {
+        this->last_asked_ms = last_asked;
+    }
 
     int32_t Get_player_x() {
         return player_x;
@@ -215,23 +156,17 @@ public:
     int32_t Get_unique_id() {
         return unique_id;
     };
-    int32_t Get_address() {
+    SOCKADDR_IN Get_address() {
         return address;
     };
     int32_t Get_connected() {
         return connected;
     };
-    int32_t Get_last_seen() {
-        return last_seen;
+    uint64_t Get_last_seen_ms() {
+        return last_seen_ms;
     };
-};
-
-class ClientStore() {
-public:
-    std::map< int32_t, Client* > clients;
-
-    void AddNewClient( Client& new_client ) {
-        clients.insert( std::make_pair( new_client, new_client.Get_unique_id() ) );
+    uint64_t Get_last_asked_ms() {
+        return last_asked_ms;
     }
 };
 
@@ -239,100 +174,123 @@ public:
 // ToDo: learn coding semantic guidelines.
 class ConnectionHandler {
     int32_t max_clients;
-    ClientStore p_ClientStore;
+    int32_t client_counter;
+    Sender* pSender;
+    std::map< int32_t, Client* > clients;
+    int32_t next_unique_id = 1;
+
+    int32_t generate_unique_id(){
+        return ++next_unique_id;
+    }
+
 public:
-    ClientHandler(ClientStore* client_store, int32_t max_clients = 16) {
-        this->p_ClientStore = client_store;
+
+    ConnectionHandler(Sender* sender, int32_t max_clients = 16) {
+        this->pSender = sender;
         this->max_clients = max_clients;
     };
 
-    void ConnectionMessageHandler(Message& r_Msg){
-        // Find client unique ID, then update clients[unique ID]
-    }
+    void ConnectionMessageHandler(const Message& r_Msg) {
+        int32_t type;
+        int32_t client_id;
+        int32_t read_index = sizeof (type);
 
-    void ConnectionThread(){
-        for(int i = 0; i < clients.size(); i++){
-            // if maxtimebetweenlastseen < client.lastseen
-            // then disconnected
-            // if timetocheck
-            // send a connection message
+        memcpy( &client_id, &r_Msg.buffer[read_index], sizeof( client_id ));
+        
+        UpdateLastSeen( client_id );
+        printAddress(clients[client_id]->Get_address());
+        printf(" connection OK.");
+    };
+
+    void RegistrationRequestHandler(const Message& r_Msg) {
+        if ( client_counter < max_clients ) {
+
+            int32_t id = this->generate_unique_id();
+            Client* client = new Client(id, r_Msg.address);
+            
+            UpdateLastSeen( id );
+
+            Message s_Msg;
+            s_Msg.SetAddress( client->Get_address() );
+            ConstructMessageContent::registrationAccepted( s_Msg, id );
+            this->pSender->Send( s_Msg );
+
+            this->clients.insert( std::make_pair(id, client) );
+            this->client_counter++;
+
+            printAddress(clients[id]->Get_address());
+            printf(" registered.");
         }
-    }
+    };
+
+    void RequestConnectionMessage(Client* clientToMessage) {
+        Message s_Msg;
+        s_Msg.SetAddress(clientToMessage->Get_address());
+        ConstructMessageContent::requestConnection(s_Msg);
+        this->pSender->Send(s_Msg);
+    };
+
+    void RemoveClient(const int32_t id) {
+        if ( clients.find(id) != clients.end() ) {
+            delete clients[id];
+            clients.erase(id);
+        }
+    };
+
+    void UpdateLastSeen(const int32_t unique_id) {
+        if (clients.find(unique_id) != clients.end()){
+            clients[unique_id]->Set_last_seen_ms( timeSinceEpochMillisec() );
+        }
+    };
+
+    void ConnectionThread() {
+        uint64_t delta_time_seen;
+        uint64_t delta_time_asked;
+        uint64_t now_milli;
+        
+        for ( ever ) {
+            
+            now_milli = timeSinceEpochMillisec();
+
+            for(auto const& cli : this->clients) {
+                delta_time_seen = now_milli - cli.second->Get_last_seen_ms();
+                
+                if (delta_time_seen >= MAX_TIME_BEFORE_DISCONNECT_MS) {
+                    this->RemoveClient(cli.first);
+                }
+                else if (delta_time_seen >= TIME_BEFORE_CHECKING_CONNECTION) {
+
+                    delta_time_asked = now_milli - cli.second->Get_last_asked_ms();
+                    if (delta_time_asked >= INTERVAL_CHECK_CONNECTION_MS) {
+                        printAddress(cli.second->Get_address());
+                        printf(" connection check.");
+                        cli.second->Set_last_asked_ms( now_milli );
+                        std::thread req_msg_thread(&ConnectionHandler::RequestConnectionMessage, this, cli.second);
+                    }
+                }
+            }
+        }
+    };
 
     void AddNewClient() {
-        // Add new client to map of clients    
-    }
+        // Add new client to map of clients
+    };
 };
 
 // Could be called something like GameLogic. Will be implemented.
 class GameLogicHandler {
 
-    ClientStore* p_clients = nullptr;
-
 public:
-    GameLogicHandler(ClientStore* clients){
-        p_clients = clients;
-    }
+    GameLogicHandler(){
+    };
 
-    void MessageLegacy(Message& r_Msg){
-        
-        // Skip the MSGTYPE
-        int32_t read_index = 0;
-        int32_t message_type;
-        int32_t client_input;
-        
-        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
-        read_index += sizeof( message_type );
+    void LegacyPositionMessageHandler(const Message& r_Msg) {
 
-        memcpy( &client_input, &r_Msg.buffer[read_index], sizeof( client_input ) );
-        read_index += sizeof( client_input );
-
-        switch ( client_input ) {
-            case 'w':
-                ++player_y;
-                break;
-            case 'a':
-                --player_x;
-                break;
-            case 's':
-                --player_y;
-                break;
-            case 'd':
-                ++player_x;
-                break;
-            case 'q':
-                is_running = 0;
-                break;
-            default:
-                printf("Unhandled client: %c\n", client_input);
-                break;
-        }
     };
 };
 
 
 class MessageHandler {
-
-    void MessageBroker(Message& r_Msg) {
-
-        int32_t message_type = -1;
-        int32_t message_type_index = 0;
-        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
-
-        switch ( message_type )
-        {
-            case MSGTYPE_LEGACYPOSITION:
-                this->pGameLogicHandler.LegacyPositionMessageHandler(r_Msg);
-                break;
-            case MSGTYPE_CONNECTION:
-                this->pConnectionHandler.ConnectionMessageHandler(r_Msg);
-                break;
-            default:
-                printf("Unhandled message type.");
-        }
-    };
-
-    bool thread_is_running = false;
 
 public:
     ConnectionHandler* pConnectionHandler = nullptr;
@@ -357,22 +315,53 @@ public:
         }
     };
 
-    void ReceiveThread() {
+    void MessageBroker(const Message& r_Msg) {
 
-        if ( this->ValidReferences ) {
+        int32_t message_type = -1;
+        int32_t message_type_index = 0;
+        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+
+
+        switch ( message_type )
+        {
+            case MSGTYPE_LEGACYPOSITION:
+                this->pGameLogicHandler->LegacyPositionMessageHandler(r_Msg);
+                break;
+            case MSGTYPE_CONNECTION:
+                this->pConnectionHandler->ConnectionMessageHandler(r_Msg);
+                break;
+            case MSGTYPE_REGISTERREQUEST:
+                this->pConnectionHandler->RegistrationRequestHandler(r_Msg);
+            default:
+                printf("Unhandled message type [%d]", MsgTypeName(message_type));
+                printf("From: ");
+                printAddress(r_Msg.address);
+        }
+    };
+
+    // https://stackoverflow.com/questions/10673585/start-thread-with-member-function
+    /*std::thread MessageBrokerThread(Message& r_Msg) {
+        return std::thread([=] { MessageBroker(r_Msg); });
+    };*/
+
+    void ReceiveThread() {
+        
+        if ( this->ValidReferences() ) {
             for( ever ) {
-                Message r_Msg;    
-                r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-                
+                Message r_Msg;
+                r_Msg.bytesReceived = recvfrom( *this->pSocket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+
                 if( r_Msg.bytesReceived == SOCKET_ERROR )
                 {
                     printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+                    r_Msg.PrintAddress();
                     break;
                 }
                 else
                 {
-                    std::thread th(&MessageHandler::UnderstandMessage, this);
-                    this->MessageBroker( r_Msg );
+                    //std::thread message_broker_thread = this->MessageBrokerThread(r_Msg);
+                    std::thread th(&MessageHandler::MessageBroker, this, std::ref(r_Msg));
+                    //message_broker_thread.detach();
                 }
             }
         }
@@ -402,7 +391,7 @@ int main(int argc, char *argv[]) {
     // and sets the passed version as the highest version of Windows Sockets support
     // that the caller can use.
     iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
-    if (iResult != 0) {
+    if ( iResult != 0 ) {
         printf("WSAStartup failed: %d\n", iResult);
         return 1;
     }
@@ -430,17 +419,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    //Communication* pCommunication = new Communication( &sock );
-    //std::thread commThread(&Communication::ReceiveThread, pCommunication);
 
-    ClientStore*       pClientStore = new ClientStore( 20 );
-    ConnectionHandler* pConnectionHandler = new ConnectionHandler( pClientStore );
-    GameLogicHandler*  pGameLogicHandler = GameLogicHandler( pClientStore );
-    MessageHandler*    pMessageHandler = new MessageHandler( &sock, pGameLogicHandler, pConnectionHandler );
 
-    pMessageHandler->connection_handler = pGameLogicHandler;
+    Sender*             pSender = new Sender( &sock );
+    ConnectionHandler*  pConnectionHandler = new ConnectionHandler( pSender );
+    GameLogicHandler*   pGameLogicHandler = new GameLogicHandler();
+    MessageHandler*     pMessageHandler = new MessageHandler( &sock, pConnectionHandler, pGameLogicHandler );
 
     std::thread message_handler_thread(&MessageHandler::ReceiveThread, pMessageHandler);
+    message_handler_thread.detach();
 
     char myChar = ' ';
     while(myChar != 'q') {
@@ -450,7 +437,7 @@ int main(int argc, char *argv[]) {
     printf("Exiting program normally...");
 
     delete pConnectionHandler;
-    delete pClientStore;
+    delete pSender;
     delete pGameLogicHandler;
     delete pMessageHandler;
     
