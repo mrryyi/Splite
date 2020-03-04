@@ -187,21 +187,41 @@ public:
     int32_t NextUniqueID(){
         lastID += 1;
         return lastID;
-    }
+    };
 
     void PrintClients() {
         printf("%d registered clients:", clients.size());
         for(auto const& cli : clients) {
             cli.second->PrintShort();
         }
-    }
+    };
 
 
     void ConnectionThread() {
+        
+        const int64_t interval_check_client_ms = 500;
+        const int64_t max_unheard_from_ms = 5000;
+        int64_t now;
+        int64_t time_since;
+        Client* client = nullptr;
 
-    }
+        for(ever) {
+            now = timeSinceEpochMillisec();
+            for( auto const& cli : clients) {
+                client = cli.second;
+                time_since = now - client->last_seen;
+                if (time_since >= max_unheard_from_ms) {
+                    // disconnect
+                }
+                else if (time_since >= interval_check_client_ms) {
+                    // send connection packet.
+                }
 
-    void MessageLegacy(Message& r_Msg){
+            }
+        }
+    };
+
+    void MessageLegacy(Message& r_Msg) {
         
         int32_t message_type;
         int64_t time_sent;
