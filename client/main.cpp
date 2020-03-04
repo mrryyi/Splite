@@ -7,6 +7,11 @@
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
+uint64_t timeSinceEpochMillisec() {
+  using namespace std::chrono;
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
 class Message {
 public:
     char buffer[SOCKET_BUFFER_SIZE];
@@ -46,6 +51,16 @@ namespace ConstructMessageContent {
 
         msg.bufferLength = sizeof( type ) + sizeof( direction );
     };
+
+    void registerRequest(Message& msg) {
+        int32_t type = MSGTYPE_REGISTERREQUEST;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
+        msg.bufferLength = sizeof( type );
+    }
 };
 
 class Communication {
@@ -56,6 +71,9 @@ public:
         socket = s;
         socket_set = 1;
     };
+
+    bool connected = false;
+    int32_t id_from_server;
 
     void Send(Message& s_Msg){
         if (sendto( *this->socket,
@@ -89,7 +107,23 @@ public:
 
     void MessageConnection(Message& r_Msg){
 
-    }
+    };
+
+    void MessageRegisterAccept(Message& r_Msg) {
+
+        int32_t read_index = 0;
+        int32_t type;
+        int32_t id;
+
+        memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
+        read_index += sizeof( type );
+
+        memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
+        read_index += sizeof( id );
+
+        this->id_from_server = id;
+        this->connected = true;
+    };
 
     void HandleMessage(Message& r_Msg) {
         r_Msg.PrintAddess();
@@ -105,6 +139,9 @@ public:
                 break;
             case MSGTYPE_CONNECTION:
                 MessageConnection(r_Msg);
+                break;
+            case MSGTYPE_REGISTERACCEPT:
+                MessageRegisterAccept(r_Msg);
                 break;
             default:
                 printf("Unhandled message type.");
@@ -188,6 +225,23 @@ int main() {
 
     Communication* pCommunication = new Communication( &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
+
+    int64_t interval_ms = 1000;
+    int64_t last_ask = timeSinceEpochMillisec();
+    int64_t now;
+    
+    while (pCommunication->connected != true) {
+        now = timeSinceEpochMillisec();
+        if (now - last_ask > interval_ms) {
+            Message s_Msg;
+            ConstructMessageContent::registerRequest(s_Msg);
+            s_Msg.SetAddress(server_address);
+            pCommunication->Send(s_Msg);
+            last_ask = now;
+        }
+    }
+
+    printf("Accepted.");
 
     for(ever) {
 

@@ -152,6 +152,7 @@ public:
         ConstructMessageContent::registerAccept( s_Msg, 1337);
         s_Msg.SetAddress(r_Msg.address);
         this->pSender->Send(s_Msg);
+        printf("Registering client.");
     };
 
     void HandleMessage(Message& r_Msg) {
@@ -175,7 +176,6 @@ public:
             default:
                 printf("Unhandled message type.");
         }
-
         
     };
 
