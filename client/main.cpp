@@ -100,23 +100,17 @@ namespace ConstructMessageContent {
     }
 };
 
-class Communication {
-    SOCKET* socket;
-    int32_t socket_set = 0;
+class Sender {
 public:
-    Communication(SOCKET* s) {
-        socket = s;
-        socket_set = 1;
-    };
+    SOCKET* socket;
+    Sender(SOCKET* s){
+        this->socket = s;
+    }
 
-    bool connected = false;
-    int32_t id_from_server = NO_ID_GIVEN;
-
-    void Send(Message& s_Msg) {
-        
+    void Send(Message& s_Msg){
         int32_t message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-
+        
         printf("[   To ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", MsgTypeName(message_type));
@@ -129,7 +123,21 @@ public:
                     s_Msg.address_size) == SOCKET_ERROR) {
             printf( "sendto failed: %d", WSAGetLastError() );
         }
+    }
+};
+
+class Communication {
+    SOCKET* pSocket;
+    Sender* pSender;
+public:
+
+    Communication(SOCKET* socket, Sender* sender) {
+        pSocket = socket;
+        pSender = sender;
     };
+
+    bool connected = false;
+    int32_t id_from_server = NO_ID_GIVEN;
 
     void MessageLegacy(Message& r_Msg) {
         // grab data from packet
@@ -156,7 +164,7 @@ public:
             Message s_Msg;
             s_Msg.SetAddress(r_Msg.address);
             ConstructMessageContent::connection(s_Msg, id_from_server);
-            this->Send(s_Msg);
+            this->pSender->Send(s_Msg);
         }
         else {
             printf("Received connection message without having an ID.\n");
@@ -177,7 +185,7 @@ public:
         Message s_Msg;
         s_Msg.SetAddress(r_Msg.address);
         ConstructMessageContent::registerAck(s_Msg, id);
-        this->Send(s_Msg);
+        this->pSender->Send(s_Msg);
     };
 
     void MessageRegisterAccept(Message& r_Msg) {
@@ -228,7 +236,7 @@ public:
     void ReceiveThread(){
         for(ever) {
             Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->socket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            r_Msg.bytesReceived = recvfrom( *this->pSocket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if( r_Msg.bytesReceived == SOCKET_ERROR )
             {
@@ -300,10 +308,10 @@ int main() {
     server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
 
     int32_t write_index;
-    int32_t message_type = MSGTYPE_LEGACYPOSITION;
     int32_t userInput;
 
-    Communication* pCommunication = new Communication( &sock );
+    Sender* pSender = new Sender( &sock );
+    Communication* pCommunication = new Communication( &sock, pSender );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
     int64_t interval_ms = 1000;
@@ -316,7 +324,7 @@ int main() {
             Message s_Msg;
             ConstructMessageContent::registerRequest(s_Msg);
             s_Msg.SetAddress(server_address);
-            pCommunication->Send(s_Msg);
+            pSender->Send(s_Msg);
             last_ask = now;
         }
     }
@@ -331,7 +339,7 @@ int main() {
         Message s_Msg;
         ConstructMessageContent::legacyPosition(s_Msg, userInput);
         s_Msg.SetAddress(server_address);
-        pCommunication->Send(s_Msg);
+        pSender->Send(s_Msg);
     }
 
     printf("Exiting program normally...");

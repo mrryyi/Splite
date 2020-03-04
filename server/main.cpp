@@ -162,6 +162,11 @@ class Communication {
     int32_t lastID = 0;
 
 public:
+
+    Communication(Sender* sender, SOCKET* socket) {
+        this->pSender = sender;
+        this->pSocket = socket;
+    };
     
     int32_t NextUniqueID(){
         lastID += 1;
@@ -175,10 +180,6 @@ public:
         }
     }
 
-    Communication(Sender* sender, SOCKET* socket) {
-        this->pSender = sender;
-        this->pSocket = socket;
-    };
 
     void ConnectionThread() {
 
@@ -283,6 +284,7 @@ public:
         printf("[ From ");
         PrintAddress(r_Msg.address);
         printf(" %s]\n", MsgTypeName(message_type));
+
         switch ( message_type )
         {
             case MSGTYPE_LEGACYPOSITION:
