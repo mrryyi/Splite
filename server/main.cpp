@@ -67,38 +67,50 @@ namespace ConstructMessageContent {
 
     void registerSyn(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_REGISTERSYN;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
 
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
+
         memcpy( &msg.buffer[write_index], &id, sizeof( id ));
         write_index += sizeof( id );
 
-        msg.bufferLength = sizeof( type ) + sizeof( id );
+        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     };
 
     void registerAccept(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_REGISTERACCEPT;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
+        
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
 
         memcpy( &msg.buffer[write_index], &id, sizeof( id ));
         write_index += sizeof( id );
 
-        msg.bufferLength = sizeof( type ) + sizeof( id );
+        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     };
 
     void connection(Message& msg) {
         int32_t type = MSGTYPE_CONNECTION;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
+        
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
 
-        msg.bufferLength = sizeof( type );
+        msg.bufferLength = sizeof( type ) + sizeof( now );
     }
 };
 
@@ -256,7 +268,7 @@ public:
         bool accepted = true;
 
         if (accepted) {
-            int32_t read_index = sizeof( int32_t ); // Size of first message variable (type)
+            int32_t read_index = sizeof( int32_t ) + sizeof( int64_t );
             int32_t id;
 
             memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
@@ -278,10 +290,19 @@ public:
     void HandleMessage(Message& r_Msg) {
 
         int32_t message_type = -1;
-        int32_t message_type_index = 0;
-        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+        int32_t read_index = 0;
+        int64_t time_sent_ms;
+        int64_t now_ms = timeSinceEpochMillisec();
+
+        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
+        read_index += sizeof( message_type );
+
+        memcpy( &time_sent_ms, &r_Msg.buffer[read_index], sizeof( time_sent_ms ) );
+        read_index += sizeof( time_sent_ms );
         
-        printf("[ From ");
+        int64_t ping_ms = now_ms - time_sent_ms;
+
+        printf("[ %dms From ", ping_ms);
         PrintAddress(r_Msg.address);
         printf(" %s]\n", MsgTypeName(message_type));
 

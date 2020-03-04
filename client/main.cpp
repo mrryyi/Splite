@@ -51,52 +51,68 @@ public:
 namespace ConstructMessageContent {
     void legacyPosition(Message& msg, int32_t direction){
         int32_t type = MSGTYPE_LEGACYPOSITION;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
+
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
 
         memcpy( &msg.buffer[write_index], &direction, sizeof( direction ) );
         write_index += sizeof( direction );
 
-        msg.bufferLength = sizeof( type ) + sizeof( direction );
+        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( direction );
     };
 
     void registerRequest(Message& msg) {
         int32_t type = MSGTYPE_REGISTERREQUEST;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
 
-        msg.bufferLength = sizeof( type );
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
+
+        msg.bufferLength = sizeof( type ) + sizeof( now );
     }
 
     void registerAck(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_REGISTERACK;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
 
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
+
         memcpy( &msg.buffer[write_index], &id, sizeof( id ));
         write_index += sizeof( id );
 
-        msg.bufferLength = sizeof( type ) + sizeof( id );
+        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     }
 
 
     void connection(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_CONNECTION;
+        int64_t now = timeSinceEpochMillisec();
         int32_t write_index = 0;
 
         memcpy( &msg.buffer[write_index], &type, sizeof( type ));
         write_index += sizeof( type );
 
+        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
+        write_index += sizeof( now );
+
         memcpy( &msg.buffer[write_index], &id, sizeof( id ));
         write_index += sizeof( id );
 
-        msg.bufferLength = sizeof( type ) + sizeof( id );
+        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     }
 };
 
@@ -175,9 +191,13 @@ public:
         int32_t read_index = 0;
         int32_t type;
         int32_t id;
+        int64_t time_sent;
 
         memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
         read_index += sizeof( type );
+
+        memcpy( &time_sent, &r_Msg.buffer[read_index], sizeof( time_sent ));
+        read_index += sizeof( time_sent );
 
         memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
         read_index += sizeof( id );
@@ -193,9 +213,13 @@ public:
         int32_t read_index = 0;
         int32_t type;
         int32_t id;
+        int64_t time_sent;
 
         memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
         read_index += sizeof( type );
+
+        memcpy( &time_sent, &r_Msg.buffer[read_index], sizeof( time_sent ));
+        read_index += sizeof( time_sent );
 
         memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
         read_index += sizeof( id );
@@ -207,10 +231,19 @@ public:
     void HandleMessage(Message& r_Msg) {
 
         int32_t message_type = -1;
-        int32_t message_type_index = 0;
-        memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+        int32_t read_index = 0;
+        int64_t time_sent_ms;
+        int64_t now_ms = timeSinceEpochMillisec();
 
-        printf("[ From ");
+        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
+        read_index += sizeof( message_type );
+
+        memcpy( &time_sent_ms, &r_Msg.buffer[read_index], sizeof( time_sent_ms ) );
+        read_index += sizeof( time_sent_ms );
+        
+        int64_t ping_ms = now_ms - time_sent_ms;
+
+        printf("[ %dms From ", ping_ms);
         PrintAddress(r_Msg.address);
         printf(" %s]\n", MsgTypeName(message_type));
 
