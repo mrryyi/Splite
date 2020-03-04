@@ -3,6 +3,7 @@
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
+#define NO_ID_GIVEN -1
 
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
@@ -11,6 +12,15 @@ uint64_t timeSinceEpochMillisec() {
   using namespace std::chrono;
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
+
+void PrintAddress(SOCKADDR_IN address) {
+        printf( "%d.%d.%d.%d:%d", 
+        address.sin_addr.S_un.S_un_b.s_b1, 
+        address.sin_addr.S_un.S_un_b.s_b2, 
+        address.sin_addr.S_un.S_un_b.s_b3, 
+        address.sin_addr.S_un.S_un_b.s_b4, 
+        address.sin_port);
+};
 
 class Message {
 public:
@@ -27,7 +37,7 @@ public:
         this->address_size = sizeof(address);
     };
 
-    void PrintAddess() {
+    void PrintAddress() {
         this->buffer[this->bytesReceived] = 0;
         printf( "%d.%d.%d.%d:%d", 
         this->address.sin_addr.S_un.S_un_b.s_b1, 
@@ -62,6 +72,20 @@ namespace ConstructMessageContent {
         msg.bufferLength = sizeof( type );
     }
 
+    void registerAck(Message& msg, int32_t id) {
+        int32_t type = MSGTYPE_REGISTERACK;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
+        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
+        write_index += sizeof( id );
+
+        msg.bufferLength = sizeof( type ) + sizeof( id );
+    }
+
+
     void connection(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_CONNECTION;
         int32_t write_index = 0;
@@ -86,9 +110,17 @@ public:
     };
 
     bool connected = false;
-    int32_t id_from_server;
+    int32_t id_from_server = NO_ID_GIVEN;
 
-    void Send(Message& s_Msg){
+    void Send(Message& s_Msg) {
+        
+        int32_t message_type;
+        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
+
+        printf("[   To ");
+        PrintAddress(s_Msg.address);
+        printf(" %s]\n", MsgTypeName(message_type));
+
         if (sendto( *this->socket,
                     s_Msg.buffer,
                     s_Msg.bufferLength,
@@ -118,8 +150,34 @@ public:
         printf("[messageType: %s, x: %d, y: %d]", MsgTypeName(type), player_x, player_y);
     };
 
-    void MessageConnection(Message& r_Msg){
+    void MessageConnection(Message& r_Msg) {
         
+        if (id_from_server != NO_ID_GIVEN) {
+            Message s_Msg;
+            s_Msg.SetAddress(r_Msg.address);
+            ConstructMessageContent::connection(s_Msg, id_from_server);
+            this->Send(s_Msg);
+        }
+        else {
+            printf("Received connection message without having an ID.\n");
+        }
+    };
+
+    void MessageRegisterSyn(Message& r_Msg) {
+        int32_t read_index = 0;
+        int32_t type;
+        int32_t id;
+
+        memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
+        read_index += sizeof( type );
+
+        memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
+        read_index += sizeof( id );
+
+        Message s_Msg;
+        s_Msg.SetAddress(r_Msg.address);
+        ConstructMessageContent::registerAck(s_Msg, id);
+        this->Send(s_Msg);
     };
 
     void MessageRegisterAccept(Message& r_Msg) {
@@ -139,11 +197,14 @@ public:
     };
 
     void HandleMessage(Message& r_Msg) {
-        r_Msg.PrintAddess();
 
         int32_t message_type = -1;
         int32_t message_type_index = 0;
         memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
+
+        printf("[ From ");
+        PrintAddress(r_Msg.address);
+        printf(" %s]\n", MsgTypeName(message_type));
 
         switch ( message_type )
         {
@@ -152,6 +213,9 @@ public:
                 break;
             case MSGTYPE_CONNECTION:
                 MessageConnection(r_Msg);
+                break;
+            case MSGTYPE_REGISTERSYN:
+                MessageRegisterSyn(r_Msg);
                 break;
             case MSGTYPE_REGISTERACCEPT:
                 MessageRegisterAccept(r_Msg);
@@ -180,6 +244,9 @@ public:
 };
 
 int main() {
+
+    // Forces stdout to be line-buffered.
+    setvbuf(stdout, NULL, _IONBF, 0);
 
     // Initialize ncurses in order to make getch() into a blocking function.
     WINDOW *w;

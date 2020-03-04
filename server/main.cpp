@@ -13,6 +13,15 @@ uint64_t timeSinceEpochMillisec() {
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
+void PrintAddress(SOCKADDR_IN address) {
+        printf( "%d.%d.%d.%d:%d", 
+        address.sin_addr.S_un.S_un_b.s_b1, 
+        address.sin_addr.S_un.S_un_b.s_b2, 
+        address.sin_addr.S_un.S_un_b.s_b3, 
+        address.sin_addr.S_un.S_un_b.s_b4, 
+        address.sin_port);
+};
+
 class Message {
 public:
     char buffer[SOCKET_BUFFER_SIZE];
@@ -28,8 +37,7 @@ public:
         this->address_size = sizeof(address);
     };
 
-    void PrintAddess() {
-        this->buffer[this->bytesReceived] = 0;
+    void PrintAddress() {
         printf( "%d.%d.%d.%d:%d", 
         this->address.sin_addr.S_un.S_un_b.s_b1, 
         this->address.sin_addr.S_un.S_un_b.s_b2, 
@@ -57,6 +65,19 @@ namespace ConstructMessageContent {
 
     };
 
+    void registerSyn(Message& msg, int32_t id) {
+        int32_t type = MSGTYPE_REGISTERSYN;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
+        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
+        write_index += sizeof( id );
+
+        msg.bufferLength = sizeof( type ) + sizeof( id );
+    };
+
     void registerAccept(Message& msg, int32_t id) {
         int32_t type = MSGTYPE_REGISTERACCEPT;
         int32_t write_index = 0;
@@ -68,7 +89,7 @@ namespace ConstructMessageContent {
         write_index += sizeof( id );
 
         msg.bufferLength = sizeof( type ) + sizeof( id );
-    }
+    };
 
     void connection(Message& msg) {
         int32_t type = MSGTYPE_CONNECTION;
@@ -89,6 +110,13 @@ public:
     }
 
     void Send(Message& s_Msg){
+        int32_t message_type;
+        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
+        
+        printf("[   To ");
+        PrintAddress(s_Msg.address);
+        printf(" %s]\n", MsgTypeName(message_type));
+
         if (sendto( *this->socket,
                     s_Msg.buffer,
                     s_Msg.bufferLength,
@@ -100,22 +128,64 @@ public:
     }
 };
 
+class Client {
+public:
+    int32_t player_x = 0;
+    int32_t player_y = 0;
+    int32_t unique_id;
+    SOCKADDR_IN address;
+    
+    int32_t last_seen;
+
+    Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
+    : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
+    {};
+    ~Client(){};
+
+    void PrintShort() {
+        printf("[id:%d, address: ", unique_id);
+        PrintAddress(this->address);
+        printf("]");
+    }
+};
+
 class Communication {
     int32_t player_x = 0;
     int32_t player_y = 0;
     int32_t is_running = 1;
 
+    std::map<int32_t, Client*> clients;
+
     Sender* pSender;
     SOCKET* pSocket;
+
+    int32_t lastID = 0;
+
 public:
+    
+    int32_t NextUniqueID(){
+        lastID += 1;
+        return lastID;
+    }
+
+    void PrintClients() {
+        printf("%d registered clients:", clients.size());
+        for(auto const& cli : clients) {
+            cli.second->PrintShort();
+        }
+    }
+
     Communication(Sender* sender, SOCKET* socket) {
         this->pSender = sender;
         this->pSocket = socket;
     };
 
+    void ConnectionThread() {
+
+    }
+
     void MessageLegacy(Message& r_Msg){
         
-        // Skip the MSGTYPE
         int32_t read_index = 0;
         int32_t message_type;
         int32_t client_input;
@@ -154,34 +224,78 @@ public:
     };
 
     void MessageConnection(Message& r_Msg) {
+        int32_t read_index = 0;
+        int32_t message_type;
+        int32_t id;
+
+        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
+        read_index += sizeof( message_type );
+
+        memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
+        read_index += sizeof( id );
 
     };
 
+    // Request to register as client from client to server
+    // We send a syn message, to get an ack message back,
+    // and THEN we accept them.
     void MessageRegisterRequest(Message& r_Msg) {
         Message s_Msg;
-        ConstructMessageContent::registerAccept( s_Msg, 1337);
         s_Msg.SetAddress(r_Msg.address);
+        // This is the id we will pass back and forth.
+        // This will carry over to when we receive MSGTYPE_REGISTERACK
+        // and becomes the id for that client.
+        uint32_t id = this->NextUniqueID();
+        ConstructMessageContent::registerSyn(s_Msg, id);
         this->pSender->Send(s_Msg);
-        printf("Registering client.");
     };
 
+    void MessageRegisterAck(Message& r_Msg) {
+        // !Todo: make this acceptance test read the message
+        bool accepted = true;
+
+        if (accepted) {
+            int32_t read_index = sizeof( int32_t ); // Size of first message variable (type)
+            int32_t id;
+
+            memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
+
+            Message s_Msg;
+            ConstructMessageContent::registerAccept( s_Msg, id );
+            s_Msg.SetAddress(r_Msg.address);
+            this->pSender->Send(s_Msg);
+
+
+            Client* new_client = new Client(id, r_Msg.address);
+            this->clients.insert(std::make_pair(id, new_client));
+            printf("Registering client: %d", id);
+            new_client->PrintShort();
+            printf("\n");
+        }
+    }
+
     void HandleMessage(Message& r_Msg) {
-        r_Msg.PrintAddess();
 
         int32_t message_type = -1;
         int32_t message_type_index = 0;
         memcpy( &message_type, &r_Msg.buffer[message_type_index], sizeof( message_type ) );
-
+        
+        printf("[ From ");
+        PrintAddress(r_Msg.address);
+        printf(" %s]\n", MsgTypeName(message_type));
         switch ( message_type )
         {
             case MSGTYPE_LEGACYPOSITION:
-                MessageLegacy(r_Msg);
+                MessageLegacy( r_Msg );
                 break;
             case MSGTYPE_CONNECTION:
-                MessageConnection(r_Msg);
+                MessageConnection( r_Msg );
                 break;
             case MSGTYPE_REGISTERREQUEST:
-                MessageRegisterRequest(r_Msg);
+                MessageRegisterRequest( r_Msg );
+                break;
+            case MSGTYPE_REGISTERACK:
+                MessageRegisterAck( r_Msg );
                 break;
             default:
                 printf("Unhandled message type.");
@@ -201,42 +315,9 @@ public:
             }
             else
             {
-                HandleMessage( r_Msg);
+                HandleMessage( r_Msg );
             }
         }
-    };
-};
-
-class Client {
-    int32_t player_x = 0;
-    int32_t player_y = 0;
-    int32_t unique_id;
-    SOCKADDR_IN address;
-    
-public:
-    Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
-    : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
-    {};
-    ~Client(){};
-
-    int32_t Set_player_x(int32_t new_x) {
-        player_x = new_x;
-    };
-    int32_t Set_player_y(int32_t new_y) {
-        player_y = new_y;
-    };
-
-    int32_t Get_player_x() {
-        return player_x;
-    };
-    int32_t Get_player_y() {
-        return player_y;
-    };
-    int32_t Get_unique_id() {
-        return unique_id;
-    };
-    SOCKADDR_IN Get_address() {
-        return address;
     };
 };
 
@@ -307,6 +388,9 @@ int main() {
     char myChar = ' ';
     while(myChar != 'q') {
 		myChar = getchar();
+        if (myChar == 'p'){
+            pCommunication->PrintClients();
+        }
 	}
     
     printf("Exiting program normally...");
