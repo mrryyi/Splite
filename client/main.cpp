@@ -61,6 +61,19 @@ namespace ConstructMessageContent {
 
         msg.bufferLength = sizeof( type );
     }
+
+    void connection(Message& msg, int32_t id) {
+        int32_t type = MSGTYPE_CONNECTION;
+        int32_t write_index = 0;
+
+        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
+        write_index += sizeof( type );
+
+        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
+        write_index += sizeof( id );
+
+        msg.bufferLength = sizeof( type ) + sizeof( id );
+    }
 };
 
 class Communication {
@@ -106,7 +119,7 @@ public:
     };
 
     void MessageConnection(Message& r_Msg){
-
+        
     };
 
     void MessageRegisterAccept(Message& r_Msg) {
