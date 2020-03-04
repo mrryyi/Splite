@@ -127,9 +127,9 @@ public:
         int32_t message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
         
-        printf("[   To ");
+        printf("[ To   ");
         PrintAddress(s_Msg.address);
-        printf(" %s]\n", MsgTypeName(message_type));
+        printf(" %s]", MsgTypeName(message_type));
 
         if (sendto( *this->socket,
                     s_Msg.buffer,
@@ -158,6 +158,7 @@ public:
     void MessageLegacy(Message& r_Msg) {
         // grab data from packet
         int32_t type;
+        int64_t time_sent;
         int32_t player_x;
         int32_t player_y;
         int32_t read_index = 0;
@@ -165,13 +166,16 @@ public:
         memcpy( &type, &r_Msg.buffer[read_index], sizeof( type ));
         read_index += sizeof( type );
 
+        memcpy( &time_sent, &r_Msg.buffer[read_index], sizeof( time_sent ));
+        read_index += sizeof( time_sent );
+
         memcpy( &player_x, &r_Msg.buffer[read_index], sizeof( player_x ) );
         read_index += sizeof( player_x );
 
         memcpy( &player_y, &r_Msg.buffer[read_index], sizeof( player_y ) );
         read_index += sizeof( player_y );
 
-        printf("[messageType: %s, x: %d, y: %d]", MsgTypeName(type), player_x, player_y);
+        printf("[x: %d, y: %d]", player_x, player_y);
     };
 
     void MessageConnection(Message& r_Msg) {
@@ -183,7 +187,7 @@ public:
             this->pSender->Send(s_Msg);
         }
         else {
-            printf("Received connection message without having an ID.\n");
+            printf("Received connection message without having an ID.");
         }
     };
 
@@ -243,9 +247,9 @@ public:
         
         int64_t ping_ms = now_ms - time_sent_ms;
 
-        printf("[ %dms From ", ping_ms);
+        printf("[ From ");
         PrintAddress(r_Msg.address);
-        printf(" %s]\n", MsgTypeName(message_type));
+        printf(" %dms %s]", ping_ms, MsgTypeName(message_type));
 
         switch ( message_type )
         {
@@ -309,7 +313,7 @@ int main() {
     // that the caller can use.
     iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
     if (iResult != 0) {
-        printf("WSAStartup failed: %d\n", iResult);
+        printf("WSAStartup failed: %d", iResult);
         return 1;
     }
 
