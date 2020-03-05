@@ -48,74 +48,50 @@ public:
 };
 
 namespace ConstructMessageContent {
-    void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running){
-        int32_t type = MSGTYPE_LEGACYPOSITION;
-        int64_t now = timeSinceEpochMillisec();
-        int32_t write_index = 0;
-
-        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
-        write_index += sizeof( type );
-
-        memcpy( &now, &msg.buffer[write_index], sizeof( now ));
-        write_index += sizeof( now );
-
-        memcpy( &msg.buffer[write_index], &x, sizeof( x ) );
-        write_index += sizeof( x );
-
-        memcpy( &msg.buffer[write_index], &y, sizeof( y ) );
-        write_index += sizeof( y );
-
-        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( x ) + sizeof( y );
+    void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running) {
+        
+        MsgContentLegacyPosition msg_content;
+        msg_content.msg_type = MSGTYPE_LEGACYPOSITION;
+        msg_content.timestamp_ms = timeSinceEpochMillisec();
+        msg_content.x = x;
+        msg_content.y = y;
+        msg_content.WriteBuffer( msg.buffer );
+        msg.bufferLength = msg_content.sizeof_content();
 
     };
 
     void registerSyn(Message& msg, int32_t id) {
-        int32_t type = MSGTYPE_REGISTERSYN;
-        int64_t now = timeSinceEpochMillisec();
-        int32_t write_index = 0;
 
-        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
-        write_index += sizeof( type );
+        MsgContentRegisterSyn msg_content;
+        msg_content.msg_type = MSGTYPE_REGISTERSYN;
+        msg_content.timestamp_ms = timeSinceEpochMillisec();
+        msg_content.id = id;
+        msg_content.WriteBuffer( msg.buffer );
+        msg.bufferLength = msg_content.sizeof_content();
 
-        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
-        write_index += sizeof( now );
-
-        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
-        write_index += sizeof( id );
-
-        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     };
 
     void registerAccept(Message& msg, int32_t id) {
-        int32_t type = MSGTYPE_REGISTERACCEPT;
-        int64_t now = timeSinceEpochMillisec();
-        int32_t write_index = 0;
 
-        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
-        write_index += sizeof( type );
-        
-        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
-        write_index += sizeof( now );
+        MsgContentRegisterAccept msg_content;
+        msg_content.msg_type = MSGTYPE_REGISTERACCEPT;
+        msg_content.timestamp_ms = timeSinceEpochMillisec();
+        msg_content.id = id;
+        msg_content.WriteBuffer( msg.buffer );
+        msg.bufferLength = msg_content.sizeof_content();
 
-        memcpy( &msg.buffer[write_index], &id, sizeof( id ));
-        write_index += sizeof( id );
-
-        msg.bufferLength = sizeof( type ) + sizeof( now ) + sizeof( id );
     };
 
-    void connection(Message& msg) {
-        int32_t type = MSGTYPE_CONNECTION;
-        int64_t now = timeSinceEpochMillisec();
-        int32_t write_index = 0;
+    void connection(Message& msg, int32_t id) {
 
-        memcpy( &msg.buffer[write_index], &type, sizeof( type ));
-        write_index += sizeof( type );
-        
-        memcpy( &msg.buffer[write_index], &now, sizeof( now ));
-        write_index += sizeof( now );
+        MsgContentConnection msg_content;
+        msg_content.msg_type = MSGTYPE_CONNECTION;
+        msg_content.timestamp_ms = timeSinceEpochMillisec();
+        msg_content.id = id;
+        msg_content.WriteBuffer( msg.buffer );
+        msg.bufferLength = msg_content.sizeof_content();
 
-        msg.bufferLength = sizeof( type ) + sizeof( now );
-    }
+    };
 };
 
 class Sender {
@@ -223,21 +199,10 @@ public:
 
     void MessageLegacy(Message& r_Msg) {
         
-        int32_t message_type;
-        int64_t time_sent;
-        int32_t client_input;
-        int32_t read_index = 0;
+        MsgContentLegacyDirection msg_content;
+        msg_content.ReadBuffer( r_Msg.buffer );
         
-        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
-        read_index += sizeof( message_type );
-
-        memcpy( &time_sent, &r_Msg.buffer[read_index], sizeof( time_sent ));
-        read_index += sizeof( time_sent );
-
-        memcpy( &client_input, &r_Msg.buffer[read_index], sizeof( client_input ) );
-        read_index += sizeof( client_input );
-
-        switch ( client_input ) {
+        switch ( msg_content.direction ) {
             case 'w':
                 ++player_y;
                 break;
@@ -254,7 +219,7 @@ public:
                 is_running = 0;
                 break;
             default:
-                printf("Unhandled client: %c\n", client_input);
+                printf("Unhandled client: %c\n", msg_content.direction);
                 break;
         }
 
@@ -300,20 +265,18 @@ public:
         bool accepted = true;
 
         if (accepted) {
-            int32_t read_index = sizeof( int32_t ) + sizeof( int64_t );
-            int32_t id;
-
-            memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
+            
+            MsgContentRegisterAck msg_content;
+            msg_content.ReadBuffer(r_Msg.buffer);
 
             Message s_Msg;
-            ConstructMessageContent::registerAccept( s_Msg, id );
+            ConstructMessageContent::registerAccept( s_Msg, msg_content.id );
             s_Msg.SetAddress(r_Msg.address);
             this->pSender->Send(s_Msg);
 
-
-            Client* new_client = new Client(id, r_Msg.address);
-            this->clients.insert(std::make_pair(id, new_client));
-            printf("Registering client: %d", id);
+            Client* new_client = new Client(msg_content.id, r_Msg.address);
+            this->clients.insert(std::make_pair(msg_content.id, new_client));
+            printf("Registering client: %d", msg_content.id);
             new_client->PrintShort();
             printf("\n");
         }
@@ -321,26 +284,22 @@ public:
 
     void HandleMessage(Message& r_Msg) {
 
-        int32_t message_type = -1;
-        int32_t read_index = 0;
-        int64_t time_sent_ms;
+        // The type of message may vary the length of the buffer content,
+        // but MsgContentBase::ReadBuffer is smart and only reads about 
+        // the members it has. It stops at msg_type and timestamp_ms
+        MsgContentBase check;
+        check.ReadBuffer(r_Msg.buffer);
+
         int64_t now_ms = timeSinceEpochMillisec();
-
-        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
-        read_index += sizeof( message_type );
-
-        memcpy( &time_sent_ms, &r_Msg.buffer[read_index], sizeof( time_sent_ms ) );
-        read_index += sizeof( time_sent_ms );
-        
-        int64_t ping_ms = now_ms - time_sent_ms;
+        int64_t ping_ms = now_ms - check.timestamp_ms;
 
         printf("[ From ");
         PrintAddress(r_Msg.address);
-        printf(" %dms %s]\n", ping_ms, MsgTypeName(message_type));
+        printf(" %dms %s]\n", ping_ms, MsgTypeName(check.msg_type));
 
-        switch ( message_type )
+        switch ( check.msg_type )
         {
-            case MSGTYPE_LEGACYPOSITION:
+            case MSGTYPE_LECACYDIRECTION:
                 MessageLegacy( r_Msg );
                 break;
             case MSGTYPE_CONNECTION:
