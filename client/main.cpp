@@ -267,9 +267,12 @@ int main() {
         return 1;
     }
 
+    srand( (unsigned) time(NULL) );
+    u_short random_port = 1000 + rand() % 56000;
+
     SOCKADDR_IN local_address;
     local_address.sin_family = AF_INET;
-    local_address.sin_port = htons( PORT_HERE );
+    local_address.sin_port = random_port;//htons( PORT_HERE );
     local_address.sin_addr.s_addr = INADDR_ANY;
     if( bind( sock, (SOCKADDR*)&local_address, sizeof( local_address ) ) == SOCKET_ERROR )
     {
