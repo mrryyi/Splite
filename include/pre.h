@@ -8,7 +8,6 @@
 // Primitive data types.
 #include "def.h"
 
-#include "structs.h"
 #include "player.h"
 #include "game.h"
 
