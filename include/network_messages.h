@@ -2,7 +2,7 @@
 
 #include "pre.h"
 
-namespace network
+namespace Network
 {
 
 enum ClientMessageType : uint8 {
@@ -35,13 +35,33 @@ static void write_uint32(uint8** buffer, uint32 ui32) {
     // assignment of the content to the spot. We need to define how to 
     // copy over the data, which memcpy does for us.
     memcpy(*buffer, &ui32, sizeof( ui32 ));
-    *buffer += sizeof(ui32);
+    *buffer += sizeof( ui32 );
 };
 
 static void write_uint64(uint8** buffer, uint64 ui64) {
     // ditto write_uint32()
     memcpy(*buffer, &ui64, sizeof( ui64 ));
-    *buffer += sizeof(ui64);
+    *buffer += sizeof( ui64 );
+};
+
+static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
+
+    //  [var]  [compressed]  [how much to shift for desired bit position]
+    //  up     .... ...u     << 0
+    //  down   .... ..d.     << 1
+    //  left   .... .l..     << 2
+    //  right  .... r...     << 3
+    //  jump   ...j ....     << 4
+    
+    uint8 compressed_input = 
+		(uint8)(input->up	? 1 << 0 : 0) |
+		(uint8)(input->down ? 1 << 1 : 0) |
+		(uint8)(input->left ? 1 << 2 : 0) |
+		(uint8)(input->right? 1 << 3 : 0) |
+		(uint8)(input->jump ? 1 << 4 : 0);
+    
+    write_uint8(buffer, compressed_input);
+    
 };
 
 static void read_uint8(uint8** buffer, uint8* ui8) {
@@ -62,51 +82,95 @@ static void read_uint64(uint8** buffer, uint64* ui64) {
     *buffer += sizeof( ui64 );
 };
 
+static void read_player_input(uint8** buffer, Player::PlayerInput* input) {
+    uint8 compressed;
+    read_uint8(buffer, &compressed);
+    
+    // Assign values to separate variables from compressed byte.
+    input->up		= compressed & 1;
+	input->down		= compressed & (1 << 1);
+	input->left		= compressed & (1 << 2);
+	input->right	= compressed & (1 << 3);
+	input->jump		= compressed & (1 << 4);
+}; 
+
 class MsgContentBase {
+protected:
 public:
 
     uint8 message_type;
-    uint64 time_ms;
+    uint64 timestamp_ms;
 
     void Write(uint8* buffer) {
         uint8* iterator = buffer;
         write_uint8(&iterator, message_type);
-        write_uint64(&iterator, time_ms);
+        write_uint64(&iterator, timestamp_ms);
     };
 
     void Read(uint8* buffer) {
         uint8* iterator = buffer;
         read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &time_ms);
+        read_uint64(&iterator, &timestamp_ms);
     };
     
     const size_t sizeof_content() {
-        return sizeof( message_type ) + sizeof( time_ms );
+        return sizeof( message_type ) + sizeof( timestamp_ms );
     };
 };
 
-class MsgID : MsgContentBase {
+class MsgID : public MsgContentBase {
 public:
+
     uint32 id;
 
     void Write(uint8* buffer) {
         uint8* iterator = buffer;
         write_uint8(&iterator, message_type);
-        write_uint64(&iterator, time_ms);
+        write_uint64(&iterator, timestamp_ms);
         write_uint32(&iterator, id);
     };
 
     void Read(uint8* buffer) {
         uint8* iterator = buffer;
         read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &time_ms);
+        read_uint64(&iterator, &timestamp_ms);
         read_uint32(&iterator, &id);
     };
     
     const size_t sizeof_content() {
-        return sizeof( message_type ) + sizeof( time_ms );
+        return sizeof( message_type ) +
+               sizeof( timestamp_ms ) +
+               sizeof( id );
     };
 };
 
+class MsgInput : public MsgID {
+public:
+    Player::PlayerInput input;
 
-}
+    void Write(uint8* buffer) {
+        uint8* iterator = buffer;
+        write_uint8(&iterator, message_type);
+        write_uint64(&iterator, timestamp_ms);
+        write_uint32(&iterator, id);
+        write_player_input(&iterator, &input);
+    };
+
+    void Read(uint8* buffer) {
+        uint8* iterator = buffer;
+        read_uint8(&iterator, &message_type);
+        read_uint64(&iterator, &timestamp_ms);
+        read_uint32(&iterator, &id);
+        read_player_input(&iterator, &input);
+    };
+    
+    const size_t sizeof_content() {
+        // sizeof( bool8 ) representing the compressed player input.
+        return sizeof( message_type ) +
+               sizeof( timestamp_ms ) +
+               sizeof( id ) + 
+               sizeof( bool8 );
+    };
+};
+
+} // end namespace Network

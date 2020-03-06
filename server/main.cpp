@@ -1,17 +1,9 @@
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
 #include "..\include\pre.h"
 #include "..\include\types.h"
-
+#include "..\include\network_messages.h"
 #include <map>
 
 #pragma comment(lib, "Ws2_32.lib")
-
-uint64_t timeSinceEpochMillisec() {
-  using namespace std::chrono;
-  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
 
 void PrintAddress(SOCKADDR_IN address) {
         printf( "%d.%d.%d.%d:%d", 

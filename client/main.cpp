@@ -1,5 +1,6 @@
 #include "..\include\pre.h"
 #include "..\include\types.h"
+#include "..\include\network_messages.h"
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -7,11 +8,6 @@
 
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
-
-uint64_t timeSinceEpochMillisec() {
-  using namespace std::chrono;
-  return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-}
 
 void PrintAddress(SOCKADDR_IN address) {
         printf( "%d.%d.%d.%d:%d", 
@@ -285,43 +281,47 @@ int main() {
     server_address.sin_port = htons( PORT_SERVER );
     server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
 
-    int32_t write_index;
-    int32_t userInput;
+    int32 write_index;
+    int32 userInput;
 
     Sender* pSender = new Sender( &sock );
     Communication* pCommunication = new Communication( &sock, pSender );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
-    int64_t interval_ms = 1000;
-    int64_t last_ask = timeSinceEpochMillisec();
-    int64_t now;
-    
-    while (pCommunication->connected != true) {
-        now = timeSinceEpochMillisec();
-        if (now - last_ask > interval_ms) {
+    int64 interval_ms = 1000;
+    int64 last_ask = timeSinceEpochMillisec();
+    int64 now;
+
+    bool running = true;
+    while( running ){ 
+        
+        
+        while (pCommunication->connected != true) {
+            now = timeSinceEpochMillisec();
+            if (now - last_ask > interval_ms) {
+                Message s_Msg;
+                ConstructMessageContent::registerRequest(s_Msg);
+                s_Msg.SetAddress(server_address);
+                pSender->Send(s_Msg);
+                last_ask = now;
+            }
+        }
+        
+        if ( pCommunication->connected ) {
+            // get input
+            userInput = getchar();
+
             Message s_Msg;
-            ConstructMessageContent::registerRequest(s_Msg);
+            ConstructMessageContent::legacyDirection(s_Msg, userInput);
             s_Msg.SetAddress(server_address);
             pSender->Send(s_Msg);
-            last_ask = now;
         }
+
+        printf("Exiting program normally...");
+
     }
-
-    printf("Accepted.");
-
-    for(ever) {
-
-        // get input
-        userInput = getchar();
-
-        Message s_Msg;
-        ConstructMessageContent::legacyDirection(s_Msg, userInput);
-        s_Msg.SetAddress(server_address);
-        pSender->Send(s_Msg);
-    }
-
-    printf("Exiting program normally...");
 
     delete pCommunication;
+    delete pSender;
     return 0;
 }
