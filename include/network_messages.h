@@ -6,18 +6,30 @@ namespace Network
 {
 
 enum ClientMessageType : uint8 {
-    RegisterRequest,
+    RegisterRequest = 0,
     RegisterAck,
-    Connection,
+    ConnectionResponse,
     Leave,
     Input
 };
 
+const char *CliMsgNames[] = {"RegisterRequest", 
+                             "RegisterAck",
+                             "ConnectionResponse",
+                             "Leave",
+                             "Input"};
+
 enum ServerMessageType : uint8 {
-    RegisterSyn,
+    RegisterSyn = 0,
     RegisterResult,
+    ConnectionRequest,
     GameState
 };
+
+const char *SrvMsgNames[] = {"RegisterSyn",
+                             "RegisterResult",
+                             "ConnectionRequest",
+                             "GameState"};
 
 static void write_uint8(uint8** buffer, uint8 ui8) {
     // Okay, so, we've a pointer to a uint8 array. (uint8** buffer)
@@ -118,7 +130,7 @@ public:
     };
 };
 
-class MsgID : public MsgContentBase {
+class MsgContentID : public MsgContentBase {
 public:
 
     uint32 id;
@@ -144,7 +156,7 @@ public:
     };
 };
 
-class MsgInput : public MsgID {
+class MsgContentInput : public MsgContentID {
 public:
     Player::PlayerInput input;
 
@@ -172,5 +184,9 @@ public:
                sizeof( bool8 );
     };
 };
+
+// TODO: fix this and sizeof stuff because sizeof can really mess things up
+// if the content varies.
+class MsgContentGameState : public MsgContentBase {};
 
 } // end namespace Network

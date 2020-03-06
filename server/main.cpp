@@ -1,116 +1,11 @@
 #include "..\include\pre.h"
 #include "..\include\types.h"
+#include "..\include\network.h"
 #include "..\include\network_messages.h"
+#include "..\include\server.h"
 #include <map>
 
 #pragma comment(lib, "Ws2_32.lib")
-
-void PrintAddress(SOCKADDR_IN address) {
-        printf( "%d.%d.%d.%d:%d", 
-        address.sin_addr.S_un.S_un_b.s_b1, 
-        address.sin_addr.S_un.S_un_b.s_b2, 
-        address.sin_addr.S_un.S_un_b.s_b3, 
-        address.sin_addr.S_un.S_un_b.s_b4, 
-        address.sin_port);
-};
-
-class Message {
-public:
-    char buffer[SOCKET_BUFFER_SIZE];
-    int32_t SOCKADDR_IN_size;
-    int32_t flags = 0;
-    SOCKADDR_IN address;
-    int address_size;
-    int32_t bufferLength;
-    int bytesReceived = SOCKET_ERROR;
-
-    void SetAddress(SOCKADDR_IN address) {
-        this->address = address;
-        this->address_size = sizeof(address);
-    };
-
-    void PrintAddress() {
-        printf( "%d.%d.%d.%d:%d", 
-        this->address.sin_addr.S_un.S_un_b.s_b1, 
-        this->address.sin_addr.S_un.S_un_b.s_b2, 
-        this->address.sin_addr.S_un.S_un_b.s_b3, 
-        this->address.sin_addr.S_un.S_un_b.s_b4, 
-        this->address.sin_port);
-    };
-};
-
-namespace ConstructMessageContent {
-    void legacyPosition(Message& msg, int32_t x, int32_t y, int32_t is_running) {
-        
-        MsgContentLegacyPosition msg_content;
-        msg_content.msg_type = MSGTYPE_LEGACYPOSITION;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.x = x;
-        msg_content.y = y;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-
-    void registerSyn(Message& msg, int32_t id) {
-
-        MsgContentRegisterSyn msg_content;
-        msg_content.msg_type = MSGTYPE_REGISTERSYN;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.id = id;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-
-    void registerAccept(Message& msg, int32_t id) {
-
-        MsgContentRegisterAccept msg_content;
-        msg_content.msg_type = MSGTYPE_REGISTERACCEPT;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.id = id;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-
-    void connection(Message& msg, int32_t id) {
-
-        MsgContentConnection msg_content;
-        msg_content.msg_type = MSGTYPE_CONNECTION;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.id = id;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-};
-
-class Sender {
-public:
-    SOCKET* socket;
-    Sender(SOCKET* s){
-        this->socket = s;
-    }
-
-    void Send(Message& s_Msg){
-        int32_t message_type;
-        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-        
-        printf("[ To   ");
-        PrintAddress(s_Msg.address);
-        printf(" %s]\n", MsgTypeName(message_type));
-
-        if (sendto( *this->socket,
-                    s_Msg.buffer,
-                    s_Msg.bufferLength,
-                    s_Msg.flags,
-                    (SOCKADDR*)&s_Msg.address,
-                    s_Msg.address_size) == SOCKET_ERROR) {
-            printf( "sendto failed: %d", WSAGetLastError() );
-        }
-    }
-};
 
 class Client {
 public:
@@ -140,19 +35,19 @@ class Communication {
 
     std::map<int32_t, Client*> clients;
 
-    Sender* pSender;
+    Network::Sender* pSender;
     SOCKET* pSocket;
 
-    int32_t lastID = 0;
+    uint32 lastID = 0;
 
 public:
 
-    Communication(Sender* sender, SOCKET* socket) {
+    Communication(Network::Sender* sender, SOCKET* socket) {
         this->pSender = sender;
         this->pSocket = socket;
     };
     
-    int32_t NextUniqueID(){
+    uint32 NextUniqueID(){
         lastID += 1;
         return lastID;
     };
@@ -164,13 +59,24 @@ public:
         }
     };
 
+    void Send(Network::Message& s_Msg){
+
+        uint8 message_type;
+        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
+
+        printf("[ To   ");
+        PrintAddress(s_Msg.address);
+        printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
+        this->pSender->Send(s_Msg);
+
+    }
 
     void ConnectionThread() {
         
-        const int64_t interval_check_client_ms = 500;
-        const int64_t max_unheard_from_ms = 5000;
-        int64_t now;
-        int64_t time_since;
+        const int64 interval_check_client_ms = 500;
+        const int64 max_unheard_from_ms = 5000;
+        int64 now;
+        int64 time_since;
         Client* client = nullptr;
 
         for(ever) {
@@ -189,82 +95,39 @@ public:
         }
     };
 
-    void MessageLegacy(Message& r_Msg) {
-        
-        MsgContentLegacyDirection msg_content;
-        msg_content.ReadBuffer( r_Msg.buffer );
-        
-        switch ( msg_content.direction ) {
-            case 'w':
-                ++player_y;
-                break;
-            case 'a':
-                --player_x;
-                break;
-            case 's':
-                --player_y;
-                break;
-            case 'd':
-                ++player_x;
-                break;
-            case 'q':
-                is_running = 0;
-                break;
-            default:
-                printf("Unhandled client: %c\n", msg_content.direction);
-                break;
-        }
-
-        Message s_Msg;
-        ConstructMessageContent::legacyPosition( s_Msg, player_x, player_y, is_running );
-        s_Msg.SetAddress(r_Msg.address);
-        this->pSender->Send(s_Msg);
-    };
-
-    void MessageConnection(Message& r_Msg) {
-        int32_t message_type;
-        int64_t time_sent;
-        int32_t id;
-        int32_t read_index = 0;
-
-        memcpy( &message_type, &r_Msg.buffer[read_index], sizeof( message_type ) );
-        read_index += sizeof( message_type );
-
-        memcpy( &time_sent, &r_Msg.buffer[read_index], sizeof( time_sent ));
-        read_index += sizeof( time_sent );
-
-        memcpy( &id, &r_Msg.buffer[read_index], sizeof( id ) );
-        read_index += sizeof( id );
-
+    void MessageConnection(Network::Message& r_Msg) {
+        Network::MsgContentID msg_content;
+        msg_content.Read( r_Msg.buffer );
+        // TODO: update last seen of client with msg_content.id
     };
 
     // Request to register as client from client to server
     // We send a syn message, to get an ack message back,
     // and THEN we accept them.
-    void MessageRegisterRequest(Message& r_Msg) {
-        Message s_Msg;
+    void MessageRegisterRequest(Network::Message& r_Msg) {
+        Network::Message s_Msg;
         s_Msg.SetAddress(r_Msg.address);
         // This is the id we will pass back and forth.
         // This will carry over to when we receive MSGTYPE_REGISTERACK
         // and becomes the id for that client.
-        uint32_t id = this->NextUniqueID();
-        ConstructMessageContent::registerSyn(s_Msg, id);
-        this->pSender->Send(s_Msg);
+        uint32 id = this->NextUniqueID();
+        Network::Construct::register_syn(s_Msg, id);
+        this->Send(s_Msg);
     };
 
-    void MessageRegisterAck(Message& r_Msg) {
+    void MessageRegisterAck(Network::Message& r_Msg) {
         // !Todo: make this acceptance test read the message
         bool accepted = true;
 
         if (accepted) {
             
-            MsgContentRegisterAck msg_content;
-            msg_content.ReadBuffer(r_Msg.buffer);
+            Network::MsgContentID msg_content;
+            msg_content.Read(r_Msg.buffer);
 
-            Message s_Msg;
-            ConstructMessageContent::registerAccept( s_Msg, msg_content.id );
+            Network::Message s_Msg;
+            Network::Construct::register_result( s_Msg, msg_content.id );
             s_Msg.SetAddress(r_Msg.address);
-            this->pSender->Send(s_Msg);
+            this->Send(s_Msg);
 
             Client* new_client = new Client(msg_content.id, r_Msg.address);
             this->clients.insert(std::make_pair(msg_content.id, new_client));
@@ -274,34 +137,33 @@ public:
         }
     }
 
-    void HandleMessage(Message& r_Msg) {
+    void HandleMessage(Network::Message& r_Msg) {
 
         // The type of message may vary the length of the buffer content,
         // but MsgContentBase::ReadBuffer is smart and only reads about 
         // the members it has. It stops at msg_type and timestamp_ms
-        MsgContentBase check;
-        check.ReadBuffer(r_Msg.buffer);
+        Network::MsgContentBase check;
+        check.Read(r_Msg.buffer);
 
-        int64_t now_ms = timeSinceEpochMillisec();
-        int64_t ping_ms = now_ms - check.timestamp_ms;
+        int64 now_ms = timeSinceEpochMillisec();
+        int64 ping_ms = now_ms - (int64) check.timestamp_ms;
 
         printf("[ From ");
         PrintAddress(r_Msg.address);
-        printf(" %dms %s]\n", ping_ms, MsgTypeName(check.msg_type));
+        printf(" %dms %s]\n", ping_ms, Network::CliMsgNames[ check.message_type ]);
 
-        switch ( check.msg_type )
+        switch ( (Network::ClientMessageType) check.message_type )
         {
-            case MSGTYPE_LECACYDIRECTION:
-                MessageLegacy( r_Msg );
-                break;
-            case MSGTYPE_CONNECTION:
-                MessageConnection( r_Msg );
-                break;
-            case MSGTYPE_REGISTERREQUEST:
+            case Network::ClientMessageType::RegisterRequest:
                 MessageRegisterRequest( r_Msg );
                 break;
-            case MSGTYPE_REGISTERACK:
+            case Network::ClientMessageType::RegisterAck:
                 MessageRegisterAck( r_Msg );
+                break;
+            case Network::ClientMessageType::ConnectionResponse:
+                MessageConnection( r_Msg );
+                break;
+            case Network::ClientMessageType::Input:
                 break;
             default:
                 printf("Unhandled message type.");
@@ -311,8 +173,8 @@ public:
 
     void ReceiveThread(){
         while( is_running ) {
-            Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->pSocket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            Network::Message r_Msg;    
+            r_Msg.bytesReceived = recvfrom( *this->pSocket, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if( r_Msg.bytesReceived == SOCKET_ERROR )
             {
@@ -387,7 +249,7 @@ int main() {
         return 1;
     }
 
-    Sender* pSender = new Sender( &sock );
+    Network::Sender* pSender = new Network::Sender( &sock );
     Communication* pCommunication = new Communication( pSender, &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 

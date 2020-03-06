@@ -1,6 +1,8 @@
 #include "..\include\pre.h"
 #include "..\include\types.h"
 #include "..\include\network_messages.h"
+#include "..\include\client.h"
+
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -9,117 +11,12 @@
 #define PORT_HERE 1500
 #define PORT_SERVER 1234
 
-void PrintAddress(SOCKADDR_IN address) {
-        printf( "%d.%d.%d.%d:%d", 
-        address.sin_addr.S_un.S_un_b.s_b1, 
-        address.sin_addr.S_un.S_un_b.s_b2, 
-        address.sin_addr.S_un.S_un_b.s_b3, 
-        address.sin_addr.S_un.S_un_b.s_b4, 
-        address.sin_port);
-};
-
-class Message {
-public:
-    char buffer[SOCKET_BUFFER_SIZE];
-    int32_t SOCKADDR_IN_size;
-    int32_t flags = 0;
-    SOCKADDR_IN address;
-    int address_size;
-    int32_t bufferLength;
-    int bytesReceived = SOCKET_ERROR;
-
-    void SetAddress(SOCKADDR_IN address) {
-        this->address = address;
-        this->address_size = sizeof(address);
-    };
-
-    void PrintAddress() {
-        this->buffer[this->bytesReceived] = 0;
-        printf( "%d.%d.%d.%d:%d", 
-        this->address.sin_addr.S_un.S_un_b.s_b1, 
-        this->address.sin_addr.S_un.S_un_b.s_b2, 
-        this->address.sin_addr.S_un.S_un_b.s_b3, 
-        this->address.sin_addr.S_un.S_un_b.s_b4, 
-        this->address.sin_port);
-    };
-};
-
-namespace ConstructMessageContent {
-    void legacyDirection(Message& msg, int32_t direction){
-
-        MsgContentLegacyDirection msg_content;
-        msg_content.msg_type = MSGTYPE_LECACYDIRECTION;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.direction = direction;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-
-    void registerRequest(Message& msg) {
-        MsgContentRegisterRequest msg_content;
-        msg_content.msg_type = MSGTYPE_REGISTERREQUEST;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-    };
-
-    void registerAck(Message& msg, int32_t id) {
-
-        MsgContentRegisterAck msg_content;
-        msg_content.msg_type = MSGTYPE_REGISTERACK;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.id = id;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-
-    void connection(Message& msg, int32_t id) {
-
-        MsgContentConnection msg_content;
-        msg_content.msg_type = MSGTYPE_CONNECTION;
-        msg_content.timestamp_ms = timeSinceEpochMillisec();
-        msg_content.id = id;
-        msg_content.WriteBuffer( msg.buffer );
-        msg.bufferLength = msg_content.sizeof_content();
-
-    };
-};
-
-class Sender {
-public:
-    SOCKET* socket;
-    Sender(SOCKET* s){
-        this->socket = s;
-    }
-
-    void Send(Message& s_Msg) {
-        // Quick ugly read of message type.
-        int32_t message_type;
-        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-        
-        printf("[ To   ");
-        PrintAddress(s_Msg.address);
-        printf(" %s]", MsgTypeName(message_type));
-
-        if (sendto( *this->socket,
-                    s_Msg.buffer,
-                    s_Msg.bufferLength,
-                    s_Msg.flags,
-                    (SOCKADDR*)&s_Msg.address,
-                    s_Msg.address_size) == SOCKET_ERROR) {
-            printf( "sendto failed: %d", WSAGetLastError() );
-        }
-    }
-};
-
 class Communication {
     SOCKET* pSocket;
-    Sender* pSender;
+    Network::Sender* pSender;
 public:
 
-    Communication(SOCKET* socket, Sender* sender) {
+    Communication(SOCKET* socket, Network::Sender* sender) {
         pSocket = socket;
         pSender = sender;
     };
@@ -127,77 +24,85 @@ public:
     bool connected = false;
     int32_t id_from_server = NO_ID_GIVEN;
 
-    void MessageLegacy(Message& r_Msg) {
+    void Send(Network::Message& s_Msg){
 
-        MsgContentLegacyPosition msg_content;
-        msg_content.ReadBuffer(r_Msg.buffer);
+        uint8 message_type;
+        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
 
-        printf("[x: %d, y: %d]", msg_content.x, msg_content.y);
-    };
-
-    void MessageConnection(Message& r_Msg) {
+        printf("[ To   ");
+        PrintAddress(s_Msg.address);
+        printf(" %s]\n", Network::CliMsgNames[ message_type ]);
+        this->pSender->Send(s_Msg);
         
-        if (id_from_server != NO_ID_GIVEN) {
-            Message s_Msg;
-            s_Msg.SetAddress(r_Msg.address);
-            ConstructMessageContent::connection( s_Msg, id_from_server );
-            this->pSender->Send( s_Msg );
-        }
-        else {
-            printf("Received connection message without having an ID.");
-        }
-    };
+    }
 
-    void MessageRegisterSyn(Message& r_Msg) {
+    void MessageRegisterSyn(Network::Message& r_Msg) {
         
-        MsgContentRegisterSyn msg_content;
-        msg_content.ReadBuffer( r_Msg.buffer );
+        Network::MsgContentID msg_content;
+        msg_content.Read( r_Msg.buffer );
 
-        Message s_Msg;
+        Network::Message s_Msg;
         s_Msg.SetAddress( r_Msg.address );
-        ConstructMessageContent::registerAck( s_Msg, msg_content.id );
-        this->pSender->Send( s_Msg );
+        Network::Construct::register_ack( s_Msg, msg_content.id );
+        this->Send( s_Msg );
 
     };
 
-    void MessageRegisterAccept(Message& r_Msg) {
+    void MessageRegisterResult(Network::Message& r_Msg) {
 
-        MsgContentRegisterAccept msg_content;
-        msg_content.ReadBuffer( r_Msg.buffer );
+        Network::MsgContentID msg_content;
+        msg_content.Read( r_Msg.buffer );
 
         this->id_from_server = msg_content.id;
         this->connected = true;
         
     };
 
-    void HandleMessage(Message& r_Msg) {
+    void MessageConnection(Network::Message& r_Msg) {
+        
+        if (id_from_server != NO_ID_GIVEN) {
+            Network::Message s_Msg;
+            s_Msg.SetAddress(r_Msg.address);
+            Network::Construct::connection( s_Msg, id_from_server );
+            this->Send( s_Msg );
+        }
+        else {
+            printf("Received connection message without having an ID.");
+        }
+    };
+
+    void MessageGameState(Network::Message& r_Msg) {
+
+    }
+
+    void HandleMessage(Network::Message& r_Msg) {
 
         // The type of message may vary the length of the buffer content,
-        // but MsgContentBase::ReadBuffer is smart and only reads about 
+        // but MsgContentBase::Read is smart and only reads about 
         // the members it has. It stops at msg_type and timestamp_ms
-        MsgContentBase check;
-        check.ReadBuffer( r_Msg.buffer );
+        Network::MsgContentBase check;
+        check.Read( r_Msg.buffer );
 
-        int64_t now_ms = timeSinceEpochMillisec();
-        int64_t ping_ms = now_ms - check.timestamp_ms;
+        int64 now_ms = timeSinceEpochMillisec();
+        int64 ping_ms = now_ms - (int64) check.timestamp_ms;
 
         printf("[ From ");
         PrintAddress(r_Msg.address);
-        printf(" %dms %s]\n", ping_ms, MsgTypeName(check.msg_type));
+        printf(" %dms %s]\n", ping_ms, Network::SrvMsgNames[ check.message_type ]);
 
-        switch ( check.msg_type )
+        switch ( (Network::ServerMessageType) check.message_type )
         {
-            case MSGTYPE_LEGACYPOSITION:
-                MessageLegacy(r_Msg);
-                break;
-            case MSGTYPE_CONNECTION:
-                MessageConnection(r_Msg);
-                break;
-            case MSGTYPE_REGISTERSYN:
+            case Network::ServerMessageType::RegisterSyn:
                 MessageRegisterSyn(r_Msg);
                 break;
-            case MSGTYPE_REGISTERACCEPT:
-                MessageRegisterAccept(r_Msg);
+            case Network::ServerMessageType::RegisterResult:
+                MessageRegisterResult(r_Msg);
+                break;
+            case Network::ServerMessageType::ConnectionRequest:
+                MessageConnection(r_Msg);
+                break;
+            case Network::ServerMessageType::GameState:
+                MessageGameState(r_Msg);
                 break;
             default:
                 printf("Unhandled message type.");
@@ -206,8 +111,8 @@ public:
 
     void ReceiveThread(){
         for(ever) {
-            Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->pSocket, r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            Network::Message r_Msg;    
+            r_Msg.bytesReceived = recvfrom( *this->pSocket, (char*) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if( r_Msg.bytesReceived == SOCKET_ERROR )
             {
@@ -284,7 +189,7 @@ int main() {
     int32 write_index;
     int32 userInput;
 
-    Sender* pSender = new Sender( &sock );
+    Network::Sender* pSender = new Network::Sender( &sock );
     Communication* pCommunication = new Communication( &sock, pSender );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
@@ -293,14 +198,16 @@ int main() {
     int64 now;
 
     bool running = true;
+
+    Player::PlayerInput input;
+
     while( running ){ 
-        
         
         while (pCommunication->connected != true) {
             now = timeSinceEpochMillisec();
             if (now - last_ask > interval_ms) {
-                Message s_Msg;
-                ConstructMessageContent::registerRequest(s_Msg);
+                Network::Message s_Msg;
+                Network::Construct::register_request(s_Msg);
                 s_Msg.SetAddress(server_address);
                 pSender->Send(s_Msg);
                 last_ask = now;
@@ -311,15 +218,22 @@ int main() {
             // get input
             userInput = getchar();
 
-            Message s_Msg;
-            ConstructMessageContent::legacyDirection(s_Msg, userInput);
+            input.up = (uint8) (userInput == 'w') ? 1 : 0; 
+            input.down = (uint8) (userInput == 's') ? 1 : 0;
+            input.left = (uint8) (userInput == 'a') ? 1 : 0;
+            input.right = (uint8) (userInput == 'd') ? 1 : 0;
+            input.jump = (uint8) (userInput == 'j') ? 1 : 0;
+            
+
+            Network::Message s_Msg;
+            Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
             s_Msg.SetAddress(server_address);
             pSender->Send(s_Msg);
         }
 
-        printf("Exiting program normally...");
-
     }
+
+    printf("Exiting program normally...");
 
     delete pCommunication;
     delete pSender;
