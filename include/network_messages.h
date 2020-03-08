@@ -23,13 +23,15 @@ enum ServerMessageType : uint8 {
     RegisterSyn = 0,
     RegisterResult,
     ConnectionRequest,
-    GameState
+    GameState,
+    Kicked
 };
 
 const char *SrvMsgNames[] = {"RegisterSyn",
                              "RegisterResult",
                              "ConnectionRequest",
-                             "GameState"};
+                             "GameState",
+                             "Kicked"};
 
 static void write_uint8(uint8** buffer, uint8 ui8) {
     // Okay, so, we've a pointer to a uint8 array. (uint8** buffer)
@@ -186,7 +188,9 @@ public:
 };
 
 // TODO: fix this and sizeof stuff because sizeof can really mess things up
-// if the content varies.
+// if the content size varies.
 class MsgContentGameState : public MsgContentBase {};
+class MsgContentKicked : public MsgContentBase {};
+class MsgContentConnection : public MsgContentID {};
 
 } // end namespace Network

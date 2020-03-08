@@ -51,5 +51,15 @@ namespace Network
 
     };
 
+    void kicked(Message& msg) {
+
+        MsgContentKicked msg_content;
+        msg_content.message_type = ServerMessageType::Kicked;
+        msg_content.timestamp_ms = timeSinceEpochMillisec();
+        msg_content.Write( msg.buffer );
+        msg.bufferLength = msg_content.sizeof_content();
+        
+    }
+
     }; // End namespace Construct
 }; // End namespace Network

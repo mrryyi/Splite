@@ -22,11 +22,13 @@ namespace Network
     };
 
     void register_request(Message& msg) {
+
         MsgContentBase msg_content;
         msg_content.message_type = ClientMessageType::RegisterRequest;
         msg_content.timestamp_ms = timeSinceEpochMillisec();
         msg_content.Write( msg.buffer );
         msg.bufferLength = msg_content.sizeof_content();
+
     };
 
     void register_ack(Message& msg, int32_t id) {

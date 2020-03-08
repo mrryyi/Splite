@@ -9,16 +9,19 @@
 
 class Client {
 public:
-    int32_t player_x = 0;
-    int32_t player_y = 0;
-    int32_t unique_id;
+    int32 player_x = 0;
+    int32 player_y = 0;
+    int32 unique_id;
     SOCKADDR_IN address;
     
-    int32_t last_seen;
+    int32 last_seen;
 
     Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
     : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
-    {};
+    {
+
+        this->last_seen = timeSinceEpochMillisec();
+    };
     ~Client(){};
 
     void PrintShort() {
@@ -29,11 +32,11 @@ public:
 };
 
 class Communication {
-    int32_t player_x = 0;
-    int32_t player_y = 0;
-    int32_t is_running = 1;
+    int32 player_x = 0;
+    int32 player_y = 0;
+    int32 is_running = 1;
 
-    std::map<int32_t, Client*> clients;
+    std::map<int32, Client*> clients;
 
     Network::Sender* pSender;
     SOCKET* pSocket;
@@ -51,12 +54,18 @@ public:
         lastID += 1;
         return lastID;
     };
+    
+    uint32 AmountOfConnectedClients() {
+        return clients.size();
+    }
 
     void PrintClients() {
+
         printf("%d registered clients:", clients.size());
         for(auto const& cli : clients) {
             cli.second->PrintShort();
         }
+
     };
 
     void Send(Network::Message& s_Msg){
@@ -69,42 +78,78 @@ public:
         printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
         this->pSender->Send(s_Msg);
 
-    }
+    };
+
+    void RemoveClientFromList(int32 id) {
+
+        printf("Removed client " );
+        clients[id]->PrintShort();
+        printf(".\n");
+        clients.erase( id );
+
+    };
+
+    void KickClient(int32 id) {
+
+        Network::Message s_Msg;
+        s_Msg.SetAddress( clients[id]->address );
+        Network::Construct::kicked( s_Msg );
+        this->Send( s_Msg );
+
+        this->RemoveClientFromList(id);
+
+    };
+
+    void ConnectionRequestToClient(int32 id) {
+
+        Network::Message s_Msg;
+        s_Msg.SetAddress( clients[id]->address );
+        Network::Construct::connection( s_Msg, id );
+        this->Send( s_Msg );
+
+    };
+
+    void CheckConnection() {
+        
+        int64 now = timeSinceEpochMillisec();
+        int64 time_since;
+
+        for(auto const& cli : clients) {
+
+            time_since = now - cli.second->last_seen;
+
+            if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
+                this->KickClient( cli.first );
+            }
+            else if ( time_since >= INTERVAL_CHECK_CLIENT_MS ) {
+                this->ConnectionRequestToClient( cli.first );
+            };
+
+        };
+
+    };
 
     void ConnectionThread() {
-        
-        const int64 interval_check_client_ms = 500;
-        const int64 max_unheard_from_ms = 5000;
-        int64 now;
-        int64 time_since;
-        Client* client = nullptr;
 
         for(ever) {
-            now = timeSinceEpochMillisec();
-            for( auto const& cli : clients) {
-                client = cli.second;
-                time_since = now - client->last_seen;
-                if (time_since >= max_unheard_from_ms) {
-                    // disconnect
-                }
-                else if (time_since >= interval_check_client_ms) {
-                    // send connection packet.
-                }
-
-            }
+            this->CheckConnection();
         }
+
     };
 
     void MessageConnection(Network::Message& r_Msg) {
+
         Network::MsgContentID msg_content;
         msg_content.Read( r_Msg.buffer );
         // TODO: update last seen of client with msg_content.id
+
     };
 
     // Request to register as client from client to server
     // We send a syn message, to get an ack message back,
     // and THEN we accept them.
     void MessageRegisterRequest(Network::Message& r_Msg) {
+
         Network::Message s_Msg;
         s_Msg.SetAddress(r_Msg.address);
         // This is the id we will pass back and forth.
@@ -113,11 +158,17 @@ public:
         uint32 id = this->NextUniqueID();
         Network::Construct::register_syn(s_Msg, id);
         this->Send(s_Msg);
+
     };
 
     void MessageRegisterAck(Network::Message& r_Msg) {
         // !Todo: make this acceptance test read the message
-        bool accepted = true;
+        
+        bool8 accepted = false;
+
+        if (AmountOfConnectedClients() < MAX_CLIENTS_CONNECTED){
+            accepted = true;
+        }
 
         if (accepted) {
             
@@ -134,6 +185,7 @@ public:
             printf("Registering client: %d", msg_content.id);
             new_client->PrintShort();
             printf("\n");
+
         }
     }
 
@@ -251,7 +303,10 @@ int main() {
 
     Network::Sender* pSender = new Network::Sender( &sock );
     Communication* pCommunication = new Communication( pSender, &sock );
-    std::thread th(&Communication::ReceiveThread, pCommunication);
+    std::thread recv_thread(&Communication::ReceiveThread, pCommunication);
+
+    // TODO: MAKE THIS ONE HAVE NOTHER SOCKET.
+     std::thread conn_thread(&Communication::ConnectionThread, pCommunication);
 
     char myChar = ' ';
     while(myChar != 'q') {

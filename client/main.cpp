@@ -73,7 +73,13 @@ public:
 
     void MessageGameState(Network::Message& r_Msg) {
 
-    }
+    };
+
+    void MessageKicked(Network::Message& r_Msg) {
+        printf("Got kicked from the server.");
+        this->connected = false;
+        this->id_from_server = NO_ID_GIVEN;
+    };
 
     void HandleMessage(Network::Message& r_Msg) {
 
@@ -103,6 +109,9 @@ public:
                 break;
             case Network::ServerMessageType::GameState:
                 MessageGameState(r_Msg);
+                break;
+            case Network::ServerMessageType::Kicked:
+                MessageKicked(r_Msg);
                 break;
             default:
                 printf("Unhandled message type.");
