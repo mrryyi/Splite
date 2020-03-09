@@ -14,7 +14,8 @@ public:
     int32 unique_id;
     SOCKADDR_IN address;
     
-    int32 last_seen;
+    int64 last_seen;
+    int64 last_asked;
 
     Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
     : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
@@ -39,15 +40,19 @@ class Communication {
     std::map<int32, Client*> clients;
 
     Network::Sender* pSender;
+    Network::Sender* pSenderConn;
     SOCKET* pSocket;
+    SOCKET* pSocketConn;
 
     uint32 lastID = 0;
 
 public:
 
-    Communication(Network::Sender* sender, SOCKET* socket) {
+    Communication(Network::Sender* sender, Network::Sender* sender_conn, SOCKET* socket, SOCKET* socket_conn) {
         this->pSender = sender;
+        this->pSenderConn = sender_conn;
         this->pSocket = socket;
+        this->pSocketConn = socket_conn;
     };
     
     uint32 NextUniqueID(){
@@ -76,7 +81,21 @@ public:
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
+
         this->pSender->Send(s_Msg);
+
+    };
+
+    void SendConnection(Network::Message& s_Msg) {
+
+        uint8 message_type;
+        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
+
+        printf("[ To   ");
+        PrintAddress(s_Msg.address);
+        printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
+        
+        this->pSenderConn->Send(s_Msg);
 
     };
 
@@ -85,6 +104,7 @@ public:
         printf("Removed client " );
         clients[id]->PrintShort();
         printf(".\n");
+        clients[id]->~Client();
         clients.erase( id );
 
     };
@@ -94,7 +114,7 @@ public:
         Network::Message s_Msg;
         s_Msg.SetAddress( clients[id]->address );
         Network::Construct::kicked( s_Msg );
-        this->Send( s_Msg );
+        this->SendConnection( s_Msg );
 
         this->RemoveClientFromList(id);
 
@@ -105,31 +125,34 @@ public:
         Network::Message s_Msg;
         s_Msg.SetAddress( clients[id]->address );
         Network::Construct::connection( s_Msg, id );
-        this->Send( s_Msg );
+        this->SendConnection( s_Msg );
 
     };
 
     void CheckConnection() {
         
-        int64 now = timeSinceEpochMillisec();
+        uint64 now = timeSinceEpochMillisec();
         int64 time_since;
 
         for(auto const& cli : clients) {
 
             time_since = now - cli.second->last_seen;
-
             if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
                 this->KickClient( cli.first );
             }
-            else if ( time_since >= INTERVAL_CHECK_CLIENT_MS ) {
+            // Ask only if either time_since surpassed the interval to check.
+            // If we've already asked within this interval, don't spam the client.
+            else if ( time_since >= INTERVAL_CHECK_CLIENT_MS &&
+                      (now - cli.second->last_asked) >= INTERVAL_CHECK_CLIENT_MS) {
                 this->ConnectionRequestToClient( cli.first );
+                cli.second->last_asked = now;
             };
 
         };
 
     };
 
-    void ConnectionThread() {
+    void ConnectionThreadCheck() {
 
         for(ever) {
             this->CheckConnection();
@@ -141,7 +164,10 @@ public:
 
         Network::MsgContentID msg_content;
         msg_content.Read( r_Msg.buffer );
-        // TODO: update last seen of client with msg_content.id
+        
+        if ( clients.count( msg_content.id ) ) {
+            clients[ msg_content.id ]->last_seen = timeSinceEpochMillisec();
+        }
 
     };
 
@@ -223,7 +249,28 @@ public:
         
     };
 
-    void ReceiveThread(){
+    void ConnectionThreadRecv() {
+
+        while ( is_running ) {
+            Network::Message r_Msg;    
+            r_Msg.bytesReceived = recvfrom( *this->pSocketConn, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+
+            if( r_Msg.bytesReceived == SOCKET_ERROR )
+            {
+                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
+                break;
+            }
+            else
+            {
+                HandleMessage( r_Msg );
+            }
+
+        }
+
+    };
+
+    void ReceiveThread() {
+
         while( is_running ) {
             Network::Message r_Msg;    
             r_Msg.bytesReceived = recvfrom( *this->pSocket, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
@@ -239,6 +286,8 @@ public:
             }
         }
     };
+
+    
 };
 
 class ClientHandler {
@@ -301,12 +350,26 @@ int main() {
         return 1;
     }
 
+    SOCKET sock_connection = socket( address_family, type, protocol );
+
+    SOCKADDR_IN local_address_conn;
+    local_address_conn.sin_family = AF_INET;
+    local_address_conn.sin_port = htons( 1235 );
+    local_address_conn.sin_addr.s_addr = INADDR_ANY;
+
+    if( bind( sock_connection, (SOCKADDR*)&local_address_conn, sizeof( local_address_conn ) ) == SOCKET_ERROR )
+    {
+        printf( "bind failed: %d", WSAGetLastError() );
+        return 1;
+    }
+
     Network::Sender* pSender = new Network::Sender( &sock );
-    Communication* pCommunication = new Communication( pSender, &sock );
+    Network::Sender* pSenderConn = new Network::Sender( &sock_connection );
+    Communication* pCommunication = new Communication( pSender, pSenderConn, &sock, &sock_connection );
     std::thread recv_thread(&Communication::ReceiveThread, pCommunication);
 
-    // TODO: MAKE THIS ONE HAVE NOTHER SOCKET.
-     std::thread conn_thread(&Communication::ConnectionThread, pCommunication);
+    std::thread conn_check_thread(&Communication::ConnectionThreadCheck, pCommunication);
+    std::thread conn_recv_thread(&Communication::ConnectionThreadRecv, pCommunication);
 
     char myChar = ' ';
     while(myChar != 'q') {

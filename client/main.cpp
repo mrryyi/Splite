@@ -61,14 +61,17 @@ public:
     void MessageConnection(Network::Message& r_Msg) {
         
         if (id_from_server != NO_ID_GIVEN) {
+
             Network::Message s_Msg;
-            s_Msg.SetAddress(r_Msg.address);
+            s_Msg.SetAddress( r_Msg.address );
             Network::Construct::connection( s_Msg, id_from_server );
             this->Send( s_Msg );
+
         }
         else {
             printf("Received connection message without having an ID.");
         }
+
     };
 
     void MessageGameState(Network::Message& r_Msg) {
