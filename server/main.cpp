@@ -3,6 +3,7 @@
 #include "..\include\network.h"
 #include "..\include\network_messages.h"
 #include "..\include\server.h"
+#include "..\include\timer.h"
 #include <map>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -40,19 +41,15 @@ class Communication {
     std::map<int32, Client*> clients;
 
     Network::Sender* pSender;
-    Network::Sender* pSenderConn;
     SOCKET* pSocket;
-    SOCKET* pSocketConn;
 
     uint32 lastID = 0;
 
 public:
 
-    Communication(Network::Sender* sender, Network::Sender* sender_conn, SOCKET* socket, SOCKET* socket_conn) {
+    Communication(Network::Sender* sender, SOCKET* socket) {
         this->pSender = sender;
-        this->pSenderConn = sender_conn;
         this->pSocket = socket;
-        this->pSocketConn = socket_conn;
     };
     
     uint32 NextUniqueID(){
@@ -77,25 +74,13 @@ public:
 
         uint8 message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-
-        printf("[ To   ");
-        PrintAddress(s_Msg.address);
-        printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
-
+        
         this->pSender->Send(s_Msg);
 
-    };
-
-    void SendConnection(Network::Message& s_Msg) {
-
-        uint8 message_type;
-        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
-        
-        this->pSenderConn->Send(s_Msg);
+
 
     };
 
@@ -114,9 +99,7 @@ public:
         Network::Message s_Msg;
         s_Msg.SetAddress( clients[id]->address );
         Network::Construct::kicked( s_Msg );
-        this->SendConnection( s_Msg );
-
-        this->RemoveClientFromList(id);
+        this->Send( s_Msg );
 
     };
 
@@ -125,7 +108,7 @@ public:
         Network::Message s_Msg;
         s_Msg.SetAddress( clients[id]->address );
         Network::Construct::connection( s_Msg, id );
-        this->SendConnection( s_Msg );
+        this->Send( s_Msg );
 
     };
 
@@ -139,6 +122,7 @@ public:
             time_since = now - cli.second->last_seen;
             if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
                 this->KickClient( cli.first );
+                this->RemoveClientFromList( cli.first );
             }
             // Ask only if either time_since surpassed the interval to check.
             // If we've already asked within this interval, don't spam the client.
@@ -208,6 +192,7 @@ public:
 
             Client* new_client = new Client(msg_content.id, r_Msg.address);
             this->clients.insert(std::make_pair(msg_content.id, new_client));
+
             printf("Registering client: %d", msg_content.id);
             new_client->PrintShort();
             printf("\n");
@@ -215,79 +200,6 @@ public:
         }
     }
 
-    void HandleMessage(Network::Message& r_Msg) {
-
-        // The type of message may vary the length of the buffer content,
-        // but MsgContentBase::ReadBuffer is smart and only reads about 
-        // the members it has. It stops at msg_type and timestamp_ms
-        Network::MsgContentBase check;
-        check.Read(r_Msg.buffer);
-
-        int64 now_ms = timeSinceEpochMillisec();
-        int64 ping_ms = now_ms - (int64) check.timestamp_ms;
-
-        printf("[ From ");
-        PrintAddress(r_Msg.address);
-        printf(" %dms %s]\n", ping_ms, Network::CliMsgNames[ check.message_type ]);
-
-        switch ( (Network::ClientMessageType) check.message_type )
-        {
-            case Network::ClientMessageType::RegisterRequest:
-                MessageRegisterRequest( r_Msg );
-                break;
-            case Network::ClientMessageType::RegisterAck:
-                MessageRegisterAck( r_Msg );
-                break;
-            case Network::ClientMessageType::ConnectionResponse:
-                MessageConnection( r_Msg );
-                break;
-            case Network::ClientMessageType::Input:
-                break;
-            default:
-                printf("Unhandled message type.");
-        }
-        
-    };
-
-    void ConnectionThreadRecv() {
-
-        while ( is_running ) {
-            Network::Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->pSocketConn, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-
-            if( r_Msg.bytesReceived == SOCKET_ERROR )
-            {
-                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-                break;
-            }
-            else
-            {
-                HandleMessage( r_Msg );
-            }
-
-        }
-
-    };
-
-    void ReceiveThread() {
-
-        while( is_running ) {
-            Network::Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->pSocket, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-            
-            if( r_Msg.bytesReceived == SOCKET_ERROR )
-            {
-                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-                break;
-            }
-            else
-            {
-                HandleMessage( r_Msg );
-            }
-        }
-    };
-
-    
 };
 
 class ClientHandler {
@@ -300,6 +212,16 @@ public:
 
 class GameHandler {
 
+};
+
+void input_thread(Communication* pCommunication) {
+    char myChar = ' ';
+    while(myChar != 'q') {
+		myChar = getchar();
+        if (myChar == 'p'){
+            pCommunication->PrintClients();
+        }
+	}
 };
 
 int main() {
@@ -339,6 +261,20 @@ int main() {
         return 1;
     }
 
+    //-------------------------
+    // Set the socket I/O mode: In this case FIONBIO
+    // enables or disables the blocking mode for the 
+    // socket based on the numerical value of iMode.
+    // If iMode = 0, blocking is enabled; 
+    // If iMode != 0, non-blocking mode is enabled.
+    // https://docs.microsoft.com/sv-se/windows/win32/api/winsock/nf-winsock-ioctlsocket?redirectedfrom=MSDN
+    __ms_u_long iMode = 0;
+
+    /*iResult = ioctlsocket( sock, FIONBIO, &iMode);
+    if (iResult != NO_ERROR) {
+        printf("ioctlsocket failed with error: %ld\n", iResult);
+    }*/
+
     SOCKADDR_IN local_address;
     local_address.sin_family = AF_INET;
     local_address.sin_port = htons( 1234 );
@@ -350,37 +286,71 @@ int main() {
         return 1;
     }
 
-    SOCKET sock_connection = socket( address_family, type, protocol );
+    Network::Sender* pSender = new Network::Sender( &sock );
+    Communication* pComm = new Communication( pSender, &sock );
+    std::thread input_th(&input_thread, pComm);
 
-    SOCKADDR_IN local_address_conn;
-    local_address_conn.sin_family = AF_INET;
-    local_address_conn.sin_port = htons( 1235 );
-    local_address_conn.sin_addr.s_addr = INADDR_ANY;
+    bool8 running = true;
 
-    if( bind( sock_connection, (SOCKADDR*)&local_address_conn, sizeof( local_address_conn ) ) == SOCKET_ERROR )
-    {
-        printf( "bind failed: %d", WSAGetLastError() );
-        return 1;
+    constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
+
+    Timer_ms::timer_start();
+    int64 ticks = 0;
+    while( running ) {
+        ticks++;
+        while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
+        {
+            Network::Message r_Msg;
+            r_Msg.bytesReceived = recvfrom( sock, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            if( r_Msg.bytesReceived != SOCKET_ERROR )
+            {
+
+                // The type of message may vary the length of the buffer content,
+                // but MsgContentBase::ReadBuffer is smart and only reads about 
+                // the members it has. It stops at msg_type and timestamp_ms
+                Network::MsgContentBase check;
+                check.Read(r_Msg.buffer);
+
+                int64 now_ms = timeSinceEpochMillisec();
+                int64 ping_ms = now_ms - (int64) check.timestamp_ms;
+
+                printf("[ From ");
+                PrintAddress(r_Msg.address);
+                printf(" %dms %s]\n", ping_ms, Network::CliMsgNames[ check.message_type ]);
+
+                switch((Network::ClientMessageType) check.message_type )
+                {
+                    case Network::ClientMessageType::RegisterRequest:
+                        pComm->MessageRegisterRequest( r_Msg );
+                        break;
+                    case Network::ClientMessageType::RegisterAck:
+                        pComm->MessageRegisterAck( r_Msg );
+                        break;
+                    case Network::ClientMessageType::ConnectionResponse:
+                        pComm->MessageConnection( r_Msg );
+                        break;
+                    case Network::ClientMessageType::Leave:
+                        break;
+                    case Network::ClientMessageType::Input:
+                        break;
+                } // End switch message type.
+
+            } // End if socket recv from.
+
+        } // End while timer not reached ms per tick.
+
+        // Restart timer after tick have passed.
+        Timer_ms::timer_start();
+
+        // Check the connection of every client.
+        pComm->CheckConnection();
     }
 
-    Network::Sender* pSender = new Network::Sender( &sock );
-    Network::Sender* pSenderConn = new Network::Sender( &sock_connection );
-    Communication* pCommunication = new Communication( pSender, pSenderConn, &sock, &sock_connection );
-    std::thread recv_thread(&Communication::ReceiveThread, pCommunication);
-
-    std::thread conn_check_thread(&Communication::ConnectionThreadCheck, pCommunication);
-    std::thread conn_recv_thread(&Communication::ConnectionThreadRecv, pCommunication);
-
-    char myChar = ' ';
-    while(myChar != 'q') {
-		myChar = getchar();
-        if (myChar == 'p'){
-            pCommunication->PrintClients();
-        }
-	}
+    input_th.join();
     
     printf("Exiting program normally...");
 
-    delete pCommunication;
+    delete pComm;
+    delete pSender;
     return 0;
 }
