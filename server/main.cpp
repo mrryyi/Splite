@@ -214,7 +214,7 @@ class GameHandler {
 
 };
 
-void input_thread(Communication* pCommunication) {
+void input_thread(Communication* pCommunication, bool8* running) {
     char myChar = ' ';
     while(myChar != 'q') {
 		myChar = getchar();
@@ -222,6 +222,7 @@ void input_thread(Communication* pCommunication) {
             pCommunication->PrintClients();
         }
 	}
+    *running = false;
 };
 
 int main() {
@@ -253,27 +254,14 @@ int main() {
     int type = SOCK_DGRAM;
     int protocol = IPPROTO_UDP;
 
-    SOCKET sock = socket( address_family, type, protocol );
+    SOCKET sock;
 
-    if( sock == INVALID_SOCKET )
+    if( !Network::make_socket( &sock ) )
     {
         printf( "socket failed: %d", WSAGetLastError() );
+        WSACleanup();
         return 1;
     }
-
-    //-------------------------
-    // Set the socket I/O mode: In this case FIONBIO
-    // enables or disables the blocking mode for the 
-    // socket based on the numerical value of iMode.
-    // If iMode = 0, blocking is enabled; 
-    // If iMode != 0, non-blocking mode is enabled.
-    // https://docs.microsoft.com/sv-se/windows/win32/api/winsock/nf-winsock-ioctlsocket?redirectedfrom=MSDN
-    __ms_u_long iMode = 0;
-
-    /*iResult = ioctlsocket( sock, FIONBIO, &iMode);
-    if (iResult != NO_ERROR) {
-        printf("ioctlsocket failed with error: %ld\n", iResult);
-    }*/
 
     SOCKADDR_IN local_address;
     local_address.sin_family = AF_INET;
@@ -285,14 +273,21 @@ int main() {
         printf( "bind failed: %d", WSAGetLastError() );
         return 1;
     }
+    
+    bool8 running = true;
 
     Network::Sender* pSender = new Network::Sender( &sock );
     Communication* pComm = new Communication( pSender, &sock );
-    std::thread input_th(&input_thread, pComm);
+    std::thread input_th(&input_thread, pComm, &running);
 
-    bool8 running = true;
 
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
+
+    char buffer[SOCKET_BUFFER_SIZE];
+    int flags = 0;
+    SOCKADDR_IN from;
+    int from_size = sizeof( from );
+    //int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
 
     Timer_ms::timer_start();
     int64 ticks = 0;
@@ -300,11 +295,13 @@ int main() {
         ticks++;
         while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
         {
-            Network::Message r_Msg;
-            r_Msg.bytesReceived = recvfrom( sock, (char *) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-            if( r_Msg.bytesReceived != SOCKET_ERROR )
+            int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+            if( bytes_received != SOCKET_ERROR )
             {
-
+                Network::Message r_Msg;
+                r_Msg.address = from;
+                r_Msg.address_size = from_size;
+                memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
                 // The type of message may vary the length of the buffer content,
                 // but MsgContentBase::ReadBuffer is smart and only reads about 
                 // the members it has. It stops at msg_type and timestamp_ms
@@ -352,5 +349,6 @@ int main() {
 
     delete pComm;
     delete pSender;
+    WSACleanup();
     return 0;
 }
