@@ -31,28 +31,20 @@ public:
     };
 };
 
-class Sender {
-public:
-    SOCKET* socket;
-    Sender(SOCKET* s){
-        this->socket = s;
-    }
 
-    void Send(Message& s_Msg){
-        uint8 message_type;
-        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-        
-        if (sendto( *this->socket,
-                    (const char*) s_Msg.buffer,
-                    s_Msg.bufferLength,
-                    s_Msg.flags,
-                    (SOCKADDR*)&s_Msg.address,
-                    s_Msg.address_size) == SOCKET_ERROR) {
-            printf( "sendto failed: %d", WSAGetLastError() );
-        }
-    }
+void Send(SOCKET* sock, Message& s_Msg){
+    uint8 message_type;
+    memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
     
-};
+    if (sendto( *sock,
+                (const char*) s_Msg.buffer,
+                s_Msg.bufferLength,
+                s_Msg.flags,
+                (SOCKADDR*)&s_Msg.address,
+                s_Msg.address_size) == SOCKET_ERROR) {
+        printf( "sendto failed: %d", WSAGetLastError() );
+    }
+}
 
 static bool8 set_sock_opt(SOCKET sock, int opt, int val)
 {

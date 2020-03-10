@@ -2,6 +2,7 @@
 #include "..\include\types.h"
 #include "..\include\network_messages.h"
 #include "..\include\client.h"
+#include "..\include\timer.h"
 
 #include <ncurses.h> // getch
 
@@ -13,12 +14,10 @@
 
 class Communication {
     SOCKET* pSocket;
-    Network::Sender* pSender;
 public:
 
-    Communication(SOCKET* socket, Network::Sender* sender) {
+    Communication(SOCKET* socket) {
         pSocket = socket;
-        pSender = sender;
     };
 
     bool connected = false;
@@ -29,10 +28,11 @@ public:
         uint8 message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
 
+        Network::Send( pSocket, s_Msg);
+
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::CliMsgNames[ message_type ]);
-        this->pSender->Send(s_Msg);
         
     }
 
@@ -84,62 +84,10 @@ public:
         this->id_from_server = NO_ID_GIVEN;
     };
 
-    void HandleMessage(Network::Message& r_Msg) {
-
-        // The type of message may vary the length of the buffer content,
-        // but MsgContentBase::Read is smart and only reads about 
-        // the members it has. It stops at msg_type and timestamp_ms
-        Network::MsgContentBase check;
-        check.Read( r_Msg.buffer );
-
-        int64 now_ms = timeSinceEpochMillisec();
-        int64 ping_ms = now_ms - (int64) check.timestamp_ms;
-
-        printf("[ From ");
-        PrintAddress(r_Msg.address);
-        printf(" %dms %s]\n", ping_ms, Network::SrvMsgNames[ check.message_type ]);
-
-        switch ( (Network::ServerMessageType) check.message_type )
-        {
-            case Network::ServerMessageType::RegisterSyn:
-                MessageRegisterSyn(r_Msg);
-                break;
-            case Network::ServerMessageType::RegisterResult:
-                MessageRegisterResult(r_Msg);
-                break;
-            case Network::ServerMessageType::ConnectionRequest:
-                MessageConnection(r_Msg);
-                break;
-            case Network::ServerMessageType::GameState:
-                MessageGameState(r_Msg);
-                break;
-            case Network::ServerMessageType::Kicked:
-                MessageKicked(r_Msg);
-                break;
-            default:
-                printf("Unhandled message type.");
-        }
-    };
-
-    void ReceiveThread(){
-        for(ever) {
-            Network::Message r_Msg;    
-            r_Msg.bytesReceived = recvfrom( *this->pSocket, (char*) r_Msg.buffer, SOCKET_BUFFER_SIZE, r_Msg.flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
-            
-            if( r_Msg.bytesReceived == SOCKET_ERROR )
-            {
-                printf( "recvfrom returned SOCKET_ERROR, WSAGetLastError() %d", WSAGetLastError() );
-                break;
-            }
-            else
-            {
-                HandleMessage( r_Msg );
-            }
-        }
-    };
 };
 
 int main() {
+    
 
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -167,6 +115,7 @@ int main() {
         printf("WSAStartup failed: %d", iResult);
         return 1;
     }
+    
 
     int address_family = AF_INET;
     int type = SOCK_DGRAM;
@@ -198,30 +147,82 @@ int main() {
     server_address.sin_port = htons( PORT_SERVER );
     server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
 
-    int32 write_index;
     int32 userInput;
+    Player::PlayerInput input;
 
-    Network::Sender* pSender = new Network::Sender( &sock );
-    Communication* pCommunication = new Communication( &sock, pSender );
-    std::thread th(&Communication::ReceiveThread, pCommunication);
+    Communication* pCommunication = new Communication( &sock );
 
     int64 interval_ms = 1000;
     int64 last_ask = timeSinceEpochMillisec();
     int64 now;
+    
+
+    constexpr float32 milliseconds_per_tick = 1000 / CLIENT_TICK_RATE;
+    Timer_ms::timer_start();
+
+    char buffer[SOCKET_BUFFER_SIZE];
+    int flags = 0;
+    SOCKADDR_IN from;
+    int from_size = sizeof( from );
 
     bool running = true;
+    
 
-    Player::PlayerInput input;
+    while( running ) {
+        while ( Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick) {
+            int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+            if( bytes_received != SOCKET_ERROR )
+            {
+                Network::Message r_Msg;
+                r_Msg.address = from;
+                r_Msg.address_size = from_size;
+                memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
 
-    while( running ){ 
+                Network::MsgContentBase check;
+                check.Read( r_Msg.buffer );
+
+                int64 now_ms = timeSinceEpochMillisec();
+                int64 ping_ms = now_ms - (int64) check.timestamp_ms;
+
+                printf("[ From ");
+                PrintAddress(r_Msg.address);
+                printf(" %dms %s]\n", ping_ms, Network::SrvMsgNames[ check.message_type ]);
+
+                switch ( (Network::ServerMessageType) check.message_type )
+                {
+                    case Network::ServerMessageType::RegisterSyn:
+                        pCommunication->MessageRegisterSyn(r_Msg);
+                        break;
+                    case Network::ServerMessageType::RegisterResult:
+                        pCommunication->MessageRegisterResult(r_Msg);
+                        break;
+                    case Network::ServerMessageType::ConnectionRequest:
+                        pCommunication->MessageConnection(r_Msg);
+                        break;
+                    case Network::ServerMessageType::GameState:
+                        pCommunication->MessageGameState(r_Msg);
+                        break;
+                    case Network::ServerMessageType::Kicked:
+                        pCommunication->MessageKicked(r_Msg);
+                        break;
+                    default:
+                        printf("Unhandled message type.");
+                } // End switch message type
+
+            } // End if received non-garbage
+
+        } // End while timer not reached ms per tick
+
+        // Restart timer after tick has passed.
+        Timer_ms::timer_start();
         
-        while (pCommunication->connected != true) {
+        if ( pCommunication->connected != true ) {
             now = timeSinceEpochMillisec();
             if (now - last_ask > interval_ms) {
                 Network::Message s_Msg;
                 Network::Construct::register_request(s_Msg);
                 s_Msg.SetAddress(server_address);
-                pSender->Send(s_Msg);
+                pCommunication->Send(s_Msg);
                 last_ask = now;
             }
         }
@@ -234,13 +235,12 @@ int main() {
             input.down = (uint8) (userInput == 's') ? 1 : 0;
             input.left = (uint8) (userInput == 'a') ? 1 : 0;
             input.right = (uint8) (userInput == 'd') ? 1 : 0;
-            input.jump = (uint8) (userInput == 'j') ? 1 : 0;
-            
+            input.jump = (uint8) (userInput == 'j') ? 1 : 0;            
 
             Network::Message s_Msg;
             Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
             s_Msg.SetAddress(server_address);
-            pSender->Send(s_Msg);
+            pCommunication->Send(s_Msg);
         }
 
     }
@@ -248,6 +248,5 @@ int main() {
     printf("Exiting program normally...");
 
     delete pCommunication;
-    delete pSender;
     return 0;
 }

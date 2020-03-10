@@ -40,15 +40,13 @@ class Communication {
 
     std::map<int32, Client*> clients;
 
-    Network::Sender* pSender;
     SOCKET* pSocket;
 
     uint32 lastID = 0;
 
 public:
 
-    Communication(Network::Sender* sender, SOCKET* socket) {
-        this->pSender = sender;
+    Communication(SOCKET* socket) {
         this->pSocket = socket;
     };
     
@@ -75,12 +73,11 @@ public:
         uint8 message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
         
-        this->pSender->Send(s_Msg);
+        Network::Send(pSocket, s_Msg);
 
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
-
 
     };
 
@@ -133,14 +130,6 @@ public:
             };
 
         };
-
-    };
-
-    void ConnectionThreadCheck() {
-
-        for(ever) {
-            this->CheckConnection();
-        }
 
     };
 
@@ -275,17 +264,15 @@ int main() {
     }
     
     bool8 running = true;
-
-    Network::Sender* pSender = new Network::Sender( &sock );
-    Communication* pComm = new Communication( pSender, &sock );
+    Communication* pComm = new Communication( &sock );
     std::thread input_th(&input_thread, pComm, &running);
 
 
-    constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
 
     int64 now;
     int64 last_check;
 
+    constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
     Timer_ms::timer_start();
     int64 ticks = 0;
 
@@ -295,10 +282,9 @@ int main() {
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
-    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
 
     while( running ) {
-        ticks++;
+        
         while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
         {
             int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
@@ -343,7 +329,7 @@ int main() {
 
         } // End while timer not reached ms per tick.
 
-        // Restart timer after tick have passed.
+        // Restart timer after tick has passed.
         Timer_ms::timer_start();
 
         // Check the connection of every client.
@@ -360,7 +346,6 @@ int main() {
     printf("Exiting program normally...");
 
     delete pComm;
-    delete pSender;
     WSACleanup();
     return 0;
 }

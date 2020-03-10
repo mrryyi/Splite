@@ -27,3 +27,4 @@ constexpr int32 SOCKET_BUFFER_SIZE = 1024;
 constexpr int32 MAX_CLIENTS_CONNECTED = 32;
 
 constexpr int32 SERVER_TICK_RATE = 120;
+constexpr int32 CLIENT_TICK_RATE = 120;
