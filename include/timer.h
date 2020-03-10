@@ -15,8 +15,7 @@ void timer_start() {
 int64 timer_get_ms_since_start(){
     using namespace std::chrono;
     int64 now = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-    int64 since = now - milliseconds_timer_started_at;
-    return since;
+    return (now - milliseconds_timer_started_at);
 };
 
 }

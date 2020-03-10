@@ -269,6 +269,7 @@ int main() {
     if( bind( sock, (SOCKADDR*)&local_address, sizeof( local_address ) ) == SOCKET_ERROR )
     {
         printf( "bind failed: %d", WSAGetLastError() );
+        WSACleanup();
         return 1;
     }
     
@@ -286,13 +287,12 @@ int main() {
     Timer_ms::timer_start();
     int64 ticks = 0;
 
-    printf("Before running");
+    printf("[Server started.]\n[Listening...]\n");
 
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
-    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
 
     while( running ) {
         ticks++;
