@@ -40,15 +40,13 @@ class Communication {
 
     std::map<int32, Client*> clients;
 
-    Network::Sender* pSender;
     SOCKET* pSocket;
 
     uint32 lastID = 0;
 
 public:
 
-    Communication(Network::Sender* sender, SOCKET* socket) {
-        this->pSender = sender;
+    Communication(SOCKET* socket) {
         this->pSocket = socket;
     };
     
@@ -75,7 +73,7 @@ public:
         uint8 message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
         
-        this->pSender->Send(s_Msg);
+        Network::send( pSocket, s_Msg );
 
         printf("[ To   ");
         PrintAddress(s_Msg.address);
@@ -276,8 +274,7 @@ int main() {
     
     bool8 running = true;
 
-    Network::Sender* pSender = new Network::Sender( &sock );
-    Communication* pComm = new Communication( pSender, &sock );
+    Communication* pComm = new Communication( &sock );
     std::thread input_th(&input_thread, pComm, &running);
 
 
@@ -360,7 +357,6 @@ int main() {
     printf("Exiting program normally...");
 
     delete pComm;
-    delete pSender;
     WSACleanup();
     return 0;
 }

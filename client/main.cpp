@@ -13,12 +13,10 @@
 
 class Communication {
     SOCKET* pSocket;
-    Network::Sender* pSender;
 public:
 
-    Communication(SOCKET* socket, Network::Sender* sender) {
+    Communication(SOCKET* socket) {
         pSocket = socket;
-        pSender = sender;
     };
 
     bool connected = false;
@@ -32,7 +30,7 @@ public:
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::CliMsgNames[ message_type ]);
-        this->pSender->Send(s_Msg);
+        Network::send( pSocket, s_Msg);
         
     }
 
@@ -201,8 +199,7 @@ int main() {
     int32 write_index;
     int32 userInput;
 
-    Network::Sender* pSender = new Network::Sender( &sock );
-    Communication* pCommunication = new Communication( &sock, pSender );
+    Communication* pCommunication = new Communication( &sock );
     std::thread th(&Communication::ReceiveThread, pCommunication);
 
     int64 interval_ms = 1000;
@@ -221,7 +218,7 @@ int main() {
                 Network::Message s_Msg;
                 Network::Construct::register_request(s_Msg);
                 s_Msg.SetAddress(server_address);
-                pSender->Send(s_Msg);
+                pCommunication->Send(s_Msg);
                 last_ask = now;
             }
         }
@@ -240,7 +237,7 @@ int main() {
             Network::Message s_Msg;
             Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
             s_Msg.SetAddress(server_address);
-            pSender->Send(s_Msg);
+            pCommunication->Send(s_Msg);
         }
 
     }
@@ -248,6 +245,6 @@ int main() {
     printf("Exiting program normally...");
 
     delete pCommunication;
-    delete pSender;
+    WSACleanup();
     return 0;
 }
