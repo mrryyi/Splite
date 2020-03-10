@@ -283,14 +283,20 @@ int main() {
 
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
 
+    int64 now;
+    int64 last_check;
+
+    Timer_ms::timer_start();
+    int64 ticks = 0;
+
+    printf("Before running");
+
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
-    //int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+    int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
 
-    Timer_ms::timer_start();
-    int64 ticks = 0;
     while( running ) {
         ticks++;
         while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
@@ -302,6 +308,7 @@ int main() {
                 r_Msg.address = from;
                 r_Msg.address_size = from_size;
                 memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
+
                 // The type of message may vary the length of the buffer content,
                 // but MsgContentBase::ReadBuffer is smart and only reads about 
                 // the members it has. It stops at msg_type and timestamp_ms
@@ -340,7 +347,12 @@ int main() {
         Timer_ms::timer_start();
 
         // Check the connection of every client.
-        pComm->CheckConnection();
+        now = timeSinceEpochMillisec();
+        if ( (now - last_check) >= INTERVAL_CHECK_CLIENT_MS) {
+            pComm->CheckConnection();
+            last_check = now;
+        }
+
     }
 
     input_th.join();

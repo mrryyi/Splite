@@ -54,4 +54,71 @@ public:
     
 };
 
+static bool8 set_sock_opt(SOCKET sock, int opt, int val)
+{
+	int len = sizeof(int);
+	if (setsockopt(sock, SOL_SOCKET, opt, (char*)&val, len) == SOCKET_ERROR)
+	{
+		return false;
+	}
+
+	int actual;
+	if (getsockopt(sock, SOL_SOCKET, opt, (char*)&actual, &len) == SOCKET_ERROR)
+	{
+		return false;
+	}
+
+	return val == actual;
+}
+
+bool8 make_socket(SOCKET* out_socket)
+{
+	int address_family = AF_INET;
+	int type = SOCK_DGRAM;
+	int protocol = IPPROTO_UDP;
+    SOCKET sock;
+	sock = socket(address_family, type, protocol);
+
+	if (!set_sock_opt(sock, SO_RCVBUF, SOCKET_BUFFER_SIZE))
+	{
+		printf("failed to set rcvbuf size");
+	}
+	if (!set_sock_opt(sock, SO_SNDBUF, SOCKET_BUFFER_SIZE))
+	{
+		printf("failed to set sndbuf size");
+	}
+
+	if (sock == INVALID_SOCKET)
+	{
+		printf("socket() failed: %d\n", WSAGetLastError());
+		return false;
+	}
+
+	// put socket in non-blocking mode
+	ULONG enabled = 1;
+
+    // You may be wondering why we pass 0x8004667E as the second argument.
+    // We actually want to pass FIONBIO, but it doesn't work, so we're using the value FIONBIO
+    // would have if it worked. This results in the correct behaviour.
+    // This issue took a million years to solve, including giving up on non-blocking sockets,
+    // trying to settle for a billion threads to solve concurrency requirements,
+    // encountering a quadrillion segfaults and WSA errors, refactoring here and there to accomodate
+    // threading, then giving up to find this:
+    //
+    // https://stackoverflow.com/a/16185001
+    //
+    // :)
+
+	int result = ioctlsocket(sock, 0x8004667E, &enabled);
+	if (result == SOCKET_ERROR)
+	{
+		printf("ioctlsocket() failed: %d\n", WSAGetLastError());
+		return false;
+	}
+
+    *out_socket = sock;
+
+	return true;
+}
+
 }

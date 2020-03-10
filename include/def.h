@@ -25,3 +25,5 @@ constexpr int64 INTERVAL_CHECK_CLIENT_MS = 500;
 constexpr int32 SOCKET_BUFFER_SIZE = 1024;
 
 constexpr int32 MAX_CLIENTS_CONNECTED = 32;
+
+constexpr int32 SERVER_TICK_RATE = 120;
