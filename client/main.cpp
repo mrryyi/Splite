@@ -4,10 +4,6 @@
 #include "..\include\client.h"
 #include "..\include\timer.h"
 
-/*
-https://how-to.fandom.com/wiki/How_to_setup_a_Simple_Direct_Media_Layer(SDL)_build_environment
-*/
-
 #include <ncurses.h> // getch
 
 #pragma comment(lib, "Ws2_32.lib")
