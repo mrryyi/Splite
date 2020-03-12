@@ -31,7 +31,7 @@ namespace Network
 
     };
 
-    void register_ack(Message& msg, int32_t id) {
+    void register_ack(Message& msg, int32 id) {
 
         MsgContentID msg_content;
         msg_content.message_type = ClientMessageType::RegisterAck;
@@ -42,7 +42,7 @@ namespace Network
 
     };
 
-    void connection(Message& msg, int32_t id) {
+    void connection(Message& msg, int32 id) {
 
         MsgContentID msg_content;
         msg_content.message_type = ClientMessageType::ConnectionResponse;

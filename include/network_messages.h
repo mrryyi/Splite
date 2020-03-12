@@ -68,11 +68,11 @@ static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
     //  jump   ...j ....     << 4
     
     uint8 compressed_input = 
-		(uint8)(input->up	? 1 << 0 : 0) |
-		(uint8)(input->down ? 1 << 1 : 0) |
-		(uint8)(input->left ? 1 << 2 : 0) |
-		(uint8)(input->right? 1 << 3 : 0) |
-		(uint8)(input->jump ? 1 << 4 : 0);
+        (uint8)(input->up   ? 1 << 0 : 0) |
+        (uint8)(input->down ? 1 << 1 : 0) |
+        (uint8)(input->left ? 1 << 2 : 0) |
+        (uint8)(input->right? 1 << 3 : 0) |
+        (uint8)(input->jump ? 1 << 4 : 0);
     
     write_uint8(buffer, compressed_input);
     
@@ -101,11 +101,11 @@ static void read_player_input(uint8** buffer, Player::PlayerInput* input) {
     read_uint8(buffer, &compressed);
     
     // Assign values to separate variables from compressed byte.
-    input->up		= compressed & 1;
-	input->down		= compressed & (1 << 1);
-	input->left		= compressed & (1 << 2);
-	input->right	= compressed & (1 << 3);
-	input->jump		= compressed & (1 << 4);
+    input->up       = compressed & 1;
+	input->down     = compressed & (1 << 1);
+	input->left     = compressed & (1 << 2);
+	input->right    = compressed & (1 << 3);
+	input->jump     = compressed & (1 << 4);
 }; 
 
 class MsgContentBase {

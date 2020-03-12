@@ -18,7 +18,7 @@ public:
     int64 last_seen;
     int64 last_asked;
 
-    Client(int32_t unique_id, SOCKADDR_IN address, int32_t player_x = 0, int32_t player_y = 0)
+    Client(int32 unique_id, SOCKADDR_IN address, int32 player_x = 0, int32 player_y = 0)
     : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
     {
 
@@ -34,8 +34,6 @@ public:
 };
 
 class Communication {
-    int32 player_x = 0;
-    int32 player_y = 0;
     int32 is_running = 1;
 
     std::map<int32, Client*> clients;
@@ -200,17 +198,6 @@ public:
 
 };
 
-class ClientHandler {
-public:
-    std::map<int32_t, Client*> clients;
-    ClientHandler() {
-
-    }
-};
-
-class GameHandler {
-
-};
 
 void input_thread(Communication* pCommunication, bool8* running) {
     char myChar = ' ';

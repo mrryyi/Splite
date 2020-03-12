@@ -21,7 +21,7 @@ public:
     };
 
     bool connected = false;
-    int32_t id_from_server = NO_ID_GIVEN;
+    int32 id_from_server = NO_ID_GIVEN;
 
     void Send(Network::Message& s_Msg) {
 
