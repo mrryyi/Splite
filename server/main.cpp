@@ -83,20 +83,24 @@ public:
 
     void RemoveClientFromList(int32 id) {
 
-        printf("Removed client " );
-        clients[id]->PrintShort();
-        printf(".\n");
-        clients[id]->~Client();
-        clients.erase( id );
+        if ( clients.count( id ) ) {
+            printf("Removed client " );
+            clients[id]->PrintShort();
+            printf(".\n");
+            clients[id]->~Client();
+            clients.erase( id );
+        }
 
     };
 
     void KickClient(int32 id) {
-
-        Network::Message s_Msg;
-        s_Msg.SetAddress( clients[id]->address );
-        Network::Construct::kicked( s_Msg );
-        this->Send( s_Msg );
+        
+        if ( clients.count( id ) ) {
+            Network::Message s_Msg;
+            s_Msg.SetAddress( clients[id]->address );
+            Network::Construct::kicked( s_Msg );
+            this->Send( s_Msg );
+        }
 
     };
 
