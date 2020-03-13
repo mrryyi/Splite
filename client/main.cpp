@@ -25,10 +25,11 @@ public:
 
         uint8 message_type;
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-
+#ifdef _DEBUG
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::CliMsgNames[ message_type ]);
+#endif
         Network::send( pSocket, s_Msg);
         
     }
@@ -180,11 +181,11 @@ int main() {
                 check.Read( r_Msg.buffer );
 
                 int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
-
+#ifdef _DEBUG
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
                 printf(" %dms %s]\n", ping_ms, Network::SrvMsgNames[ check.message_type ]);
-
+#endif
                 switch ( (Network::ServerMessageType) check.message_type )
                 {
                     case Network::ServerMessageType::RegisterSyn:

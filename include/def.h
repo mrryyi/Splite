@@ -4,7 +4,7 @@
 #endif
 
 #define ever ;;
-
+#define _DEBUG
 
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
