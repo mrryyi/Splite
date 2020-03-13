@@ -2,3 +2,4 @@
 *.stackdump
 *.exe
 *.code-workspace
+*.vs/

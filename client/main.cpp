@@ -4,8 +4,6 @@
 #include "..\include\client.h"
 #include "..\include\timer.h"
 
-#include <ncurses.h> // getch
-
 #pragma comment(lib, "Ws2_32.lib")
 #define NO_ID_GIVEN -1
 
@@ -20,7 +18,7 @@ public:
         pSocket = socket;
     };
 
-    bool connected = false;
+    bool8 connected = false;
     int32 id_from_server = NO_ID_GIVEN;
 
     void Send(Network::Message& s_Msg) {
@@ -174,13 +172,14 @@ int main() {
                 Network::Message r_Msg;
                 r_Msg.address = from;
                 r_Msg.address_size = from_size;
+                r_Msg.timestamp_received_ms = timeSinceEpochMillisec();
                 memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
 
+                // The Read() function of MsgContentBase only reads ID and timestamp.
                 Network::MsgContentBase check;
                 check.Read( r_Msg.buffer );
 
-                int64 now_ms = timeSinceEpochMillisec();
-                int64 ping_ms = now_ms - (int64) check.timestamp_ms;
+                int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
 
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
@@ -224,9 +223,9 @@ int main() {
             }
         }
         
-        if ( pCommunication->connected ) {
+        if ( (bool8) 0 && pCommunication->connected ) {
             // get input
-            userInput = getchar();
+            //userInput = getchar();
 
             input.up = (uint8) (userInput == 'w') ? 1 : 0; 
             input.down = (uint8) (userInput == 's') ? 1 : 0;

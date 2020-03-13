@@ -1,5 +1,5 @@
 client: main.o
-	g++ -o client main.o -lwsock32 -lncurses 
+	g++ -o client main.o -lwsock32
 
 main.o: main.cpp
 	g++ -c main.cpp

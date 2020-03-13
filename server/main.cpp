@@ -4,6 +4,7 @@
 #include "..\include\network_messages.h"
 #include "..\include\server.h"
 #include "..\include\timer.h"
+#include <thread>
 #include <map>
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -265,7 +266,6 @@ int main() {
     Communication* pComm = new Communication( &sock );
     std::thread input_th(&input_thread, pComm, &running);
 
-
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
 
     int64 now;
@@ -291,6 +291,7 @@ int main() {
                 Network::Message r_Msg;
                 r_Msg.address = from;
                 r_Msg.address_size = from_size;
+                r_Msg.timestamp_received_ms = timeSinceEpochMillisec();
                 memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
 
                 // The type of message may vary the length of the buffer content,
@@ -298,9 +299,8 @@ int main() {
                 // the members it has. It stops at msg_type and timestamp_ms
                 Network::MsgContentBase check;
                 check.Read(r_Msg.buffer);
-
-                int64 now_ms = timeSinceEpochMillisec();
-                int64 ping_ms = now_ms - (int64) check.timestamp_ms;
+                
+                int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
 
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
