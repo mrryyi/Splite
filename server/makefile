@@ -1,9 +1,17 @@
-server: main.o
-	g++ -o server main.o -lwsock32
+CXX = g++
+COMPILE_FLAGS = -c
+LIBRARIES =
+LDFLAGS = $(LIBRARIES) -lwsock32
 
-main.o: main.cpp
-	g++ -c main.cpp
+TARGET = server.exe
+cpp_files = main.cpp
+objects = $(cpp_files:.cpp=.o)
 
-.PHONE: clean
-clean:
-	rm server *.o
+all: $(TARGET)
+
+$(TARGET): $(objects)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+.PHONY : clean
+clean :
+	-rm $(TARGET) $(objects) *.o
