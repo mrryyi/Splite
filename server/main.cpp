@@ -58,26 +58,23 @@ int main() {
         WSACleanup();
         return 1;
     }
-    
-    bool8 running = true;
 
     Communication* pComm = new Communication( &sock );
-
-    constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
-
-    int64 now;
-    int64 last_check;
-
-    Timer_ms::timer_start();
-    int64 ticks = 0;
-
-    printf("[Server started.]\n[Listening...]\n");
 
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
 
+    printf("[Server started.]\n[Listening...]\n");
+
+    constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
+    int64 now;
+    int64 last_check;
+    int64 ticks = 0;
+
+    bool8 running = true;
+    Timer_ms::timer_start();
     while( running ) {
         ticks++;
         while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
