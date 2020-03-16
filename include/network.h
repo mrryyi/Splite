@@ -37,7 +37,7 @@ public:
     };
 };
 
-void send(SOCKET* sock, Message& s_Msg){
+void send_msg(SOCKET* sock, Message& s_Msg){
     uint8 message_type;
     memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
     

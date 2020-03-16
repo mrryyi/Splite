@@ -6,6 +6,8 @@
 #define ever ;;
 #define _DEBUG
 
+#define NO_ID_GIVEN -1
+
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
 typedef unsigned short uint16;

@@ -3,7 +3,7 @@ COMPILE_FLAGS = -c
 LIBRARIES =
 
 # https://gist.github.com/gzmask/329661
-LDFLAGS = $(LIBRARIES) -lwsock32 -lopengl32 -lglu32
+LDFLAGS = $(LIBRARIES) -lwsock32 -lopengl32 -lglu32 -glfw3
 
 TARGET = client.exe
 cpp_files = main.cpp
@@ -16,4 +16,4 @@ $(TARGET): $(objects)
 
 .PHONY : clean
 clean :
-	-rm $(TARGET) $(objects) *.o
+	-rm $(TARGET) $(objects) *.o *.exe
