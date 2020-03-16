@@ -17,10 +17,11 @@ public:
     int64 last_asked;
 
     Client(int32 unique_id, SOCKADDR_IN address, int32 player_x = 0, int32 player_y = 0)
-    : unique_id(unique_id), address(address), player_x(player_x), player_y(player_y)
+    : unique_id(unique_id), address(address)
     {
 
         this->last_seen = timeSinceEpochMillisec();
+
     };
     ~Client(){};
 
