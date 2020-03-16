@@ -10,8 +10,6 @@
 
 class Client {
 public:
-    int32 player_x = 0;
-    int32 player_y = 0;
     int32 unique_id;
     SOCKADDR_IN address;
     

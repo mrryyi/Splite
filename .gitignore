@@ -3,4 +3,5 @@
 *.exe
 *.code-workspace
 *.vs/
+*.vscode/
 doc/
