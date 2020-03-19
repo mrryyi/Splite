@@ -14,4 +14,9 @@ FRESULT init() {
     return FRESULT(FR_OK);
 };
 
+FRESULT terminate() {
+    glfwTerminate();
+    return FRESULT(FR_OK);
+};
+
 }
