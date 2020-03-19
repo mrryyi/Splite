@@ -65,7 +65,7 @@ int main() {
     int flags = 0;
     SOCKADDR_IN from;
     int from_size = sizeof( from );
-
+    
     printf("[Server started.]\n[Listening...]\n");
 
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;

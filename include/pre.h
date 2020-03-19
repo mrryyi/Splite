@@ -7,7 +7,7 @@
 #include <thread>
 // Primitive data types.
 #include "def.h"
-
+#include "sperror.h"
 #include "player.h"
 #include "game.h"
 

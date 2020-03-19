@@ -6,9 +6,6 @@
 
 #include "comm.h"
 
-// Our fancy schmancy graphics handler
-#include <GLFW/glfw3.h>
-
 #pragma comment(lib, "Ws2_32.lib")
 
 #define PORT_HERE 1500
