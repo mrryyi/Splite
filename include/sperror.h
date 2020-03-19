@@ -1,19 +1,18 @@
 #pragma once
 
 #include "def.h"
-constexpr int32 FRES = 10000;
 constexpr int32 FR_OK = 0;
+
 // FRESULT Error Start. Means we start errors at 10000 so we can identify if an FRESULT is error or not.
+constexpr int32 FRES = 10000;
 constexpr int32 FR_FAILURE = FRES + 1;
 
 class FRESULT {
     // FRESULT value.
     int32 v;
 public:
-    FRESULT(const int32 v) : v(v) {
-    }
-    FRESULT() {
-    }
+    FRESULT(const int32 v) : v(v) {}
+    FRESULT() {}
     ~FRESULT () {
         // Possibility for an autotrace here.
         // Something that outputs to a file

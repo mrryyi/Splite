@@ -4,21 +4,23 @@
 #include "..\include\network.h"
 #include "..\include\timer.h"
 
+#include "..\include\graphics.h"
 #include "comm.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
-#define PORT_HERE 1500
 #define PORT_SERVER 1234
 
 int main() {
 
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
+    FRESULT fr;
 
-    // Initialize ncurses in order to make getch() into a blocking function.
-    //WINDOW *w;
-    //w = initscr();
+    fr = graphics::init();
+    if (fr) {
+        return 1;
+    }
     
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
@@ -111,7 +113,8 @@ int main() {
 #ifdef _DEBUG
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
-                printf(" %dms %s]\n", ping_ms, Network::SrvMsgNames[ check.message_type ]);
+                printf(" %dms", ping_ms);
+                printf(" %s]\n", Network::SrvMsgNames[ check.message_type ]);
 #endif
                 switch ( (Network::ServerMessageType) check.message_type )
                 {

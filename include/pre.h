@@ -1,6 +1,6 @@
 #pragma once
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #include <stdio.h>

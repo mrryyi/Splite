@@ -23,6 +23,7 @@ typedef double float64;
 
 constexpr int64 MAX_TIME_UNHEARD_FROM_MS = 5000;
 constexpr int64 INTERVAL_CHECK_CLIENT_MS = 500;
+constexpr int64 INTERVAL_CHECK_CLIENTS_MS = 50;
 
 constexpr int32 SOCKET_BUFFER_SIZE = 1024;
 

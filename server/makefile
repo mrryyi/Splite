@@ -1,7 +1,7 @@
 CXX = g++
 COMPILE_FLAGS = -c
 LIBRARIES =
-LDFLAGS = $(LIBRARIES) -lwsock32 -std=c++0x -pthread
+LDFLAGS = $(LIBRARIES) -lwsock32
 
 TARGET = server.exe
 cpp_files = main.cpp

@@ -7,16 +7,20 @@ namespace graphics
 {
 
 FRESULT init() {
+
     if (!glfwInit()){
         return FRESULT(FR_FAILURE);
     }
 
     return FRESULT(FR_OK);
+    
 };
 
 FRESULT terminate() {
+
     glfwTerminate();
     return FRESULT(FR_OK);
+
 };
 
 }

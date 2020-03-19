@@ -7,6 +7,7 @@
 #include "..\include\msg_construct_server.h"
 
 #include <map>
+#include <vector>
 
 class Client {
 public:
@@ -117,12 +118,13 @@ public:
         uint64 now = timeSinceEpochMillisec();
         int64 time_since;
 
+        std::vector<int64> clients_to_kick;
+
         for(auto const& cli : clients) {
 
             time_since = now - cli.second->last_seen;
             if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
-                this->KickClient( cli.first );
-                this->RemoveClientFromList( cli.first );
+                clients_to_kick.push_back( cli.first );
             }
             // Ask only if either time_since surpassed the interval to check.
             // If we've already asked within this interval, don't spam the client.
@@ -132,6 +134,14 @@ public:
                 cli.second->last_asked = now;
             };
 
+        };
+
+        // So that we don't segfault by removing clients inside
+        // the iteration above lol.
+        for(int i = 0; i < clients_to_kick.size(); i++) {
+            
+            this->KickClient( clients_to_kick[i] );
+            this->RemoveClientFromList( clients_to_kick[i] );
         };
 
     };

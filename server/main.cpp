@@ -98,7 +98,8 @@ int main() {
 #ifdef _DEBUG
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
-                printf(" %dms %s]\n", ping_ms, Network::CliMsgNames[ check.message_type ]);
+                printf(" %dms", ping_ms);
+                printf(" %s]\n", Network::CliMsgNames[ check.message_type ]);
 #endif
                 switch((Network::ClientMessageType) check.message_type )
                 {
@@ -126,7 +127,7 @@ int main() {
 
         // Check the connection of every client.
         now = timeSinceEpochMillisec();
-        if ( (now - last_check) >= INTERVAL_CHECK_CLIENT_MS) {
+        if ( (now - last_check) >= INTERVAL_CHECK_CLIENTS_MS) {
             pComm->CheckConnection();
             last_check = now;
         }
