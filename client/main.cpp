@@ -19,7 +19,14 @@ int main() {
 
     fr = graphics::init();
     if (fr) {
-        return 1;
+        exit(EXIT_FAILURE);
+    }
+
+    graphics::GraphicsHandle graphics_handle;
+
+    fr = graphics::create_window(graphics_handle);
+    if (fr) {
+        exit(EXIT_FAILURE);
     }
     
     // We create a WSADATA object called wsaData.
@@ -39,7 +46,7 @@ int main() {
     iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
     if (iResult != 0) {
         printf("WSAStartup failed: %d", iResult);
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
     int address_family = AF_INET;
@@ -52,7 +59,7 @@ int main() {
     {
         printf( "socket failed: %d", WSAGetLastError() );
         WSACleanup();
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
     srand( (unsigned) time(NULL) );
@@ -66,7 +73,7 @@ int main() {
     if( bind( sock, (SOCKADDR*)&local_address, sizeof( local_address ) ) == SOCKET_ERROR )
     {
         printf( "bind failed: %d", WSAGetLastError() );
-        return 1;
+        exit(EXIT_FAILURE);
     }
 
     SOCKADDR_IN server_address;
@@ -84,6 +91,12 @@ int main() {
     int64 now;
 
     constexpr float32 milliseconds_per_tick = 1000 / ((float32) CLIENT_TICK_RATE);
+
+    constexpr int32 framerate = 144;
+    constexpr float32 milliseconds_per_frame = 1000 / (float32) framerate;
+    int64 last_frame_ms = timeSinceEpochMillisec();
+
+
     Timer_ms::timer_start();
 
     char buffer[SOCKET_BUFFER_SIZE];
@@ -143,7 +156,7 @@ int main() {
 
         Timer_ms::timer_start();
         
-        if (pCommunication->connected != true) {
+        if ( pCommunication->connected != true ) {
             now = timeSinceEpochMillisec();
             if (now - last_ask > interval_ms) {
                 Network::Message s_Msg;
@@ -171,11 +184,27 @@ int main() {
             pCommunication->Send(s_Msg);
         }
 
+        // Update physics
+        // TODO: ADD PHYSICS
+        
+
+        // Update graphics
+        // Should take in a gamestate object.
+        now = timeSinceEpochMillisec();
+        if (now - last_frame_ms >= milliseconds_per_frame) {
+            graphics_handle.Update();
+            last_frame_ms = now;
+        }
     }
 
     printf("Exiting program normally...");
 
+    fr = graphics::terminate();
+    if (fr) {
+        printf("Couldn't terminate graphics");
+    }
+
     delete pCommunication;
     WSACleanup();
-    return 0;
+    exit(EXIT_SUCCESS);
 }
