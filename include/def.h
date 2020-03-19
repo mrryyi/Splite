@@ -21,12 +21,14 @@ typedef uint8 bool8;
 typedef float float32;
 typedef double float64;
 
+// If client has not been heard from for this long, then kick them.
 constexpr int64 MAX_TIME_UNHEARD_FROM_MS = 5000;
+// Send requests every this many milliseconds, if unheard from for this many milliseconds.
 constexpr int64 INTERVAL_CHECK_CLIENT_MS = 500;
+// How many milliseconds we wait before going into the function that checks the above.
 constexpr int64 INTERVAL_CHECK_CLIENTS_MS = 50;
 
 constexpr int32 SOCKET_BUFFER_SIZE = 1024;
-
 constexpr int32 MAX_CLIENTS_CONNECTED = 32;
 
 constexpr int32 SERVER_TICK_RATE = 120;
