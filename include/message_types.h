@@ -24,13 +24,15 @@ enum ServerMessageType : uint8 {
     RegisterResult,
     ConnectionRequest,
     GameState,
-    Kicked
+    Kicked,
+    PlayerStates
 };
 
 const char *SrvMsgNames[] = {"RegisterSyn",
                              "RegisterResult",
                              "ConnectionRequest",
                              "GameState",
-                             "Kicked"};
+                             "Kicked",
+                             "PlayerStates"};
 
 }

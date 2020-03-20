@@ -59,7 +59,9 @@ int main() {
         return 1;
     }
 
-    Communication* pComm = new Communication( &sock );
+    ClientMap clients;
+
+    Communication* pComm = new Communication( &sock, &clients );
 
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
@@ -69,6 +71,8 @@ int main() {
     printf("[Server started.]\n[Listening...]\n");
 
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
+    constexpr float32 acceleration_per_millisecond = 0.5;
+    constexpr float32 gravitation_y_per_millisecond = 0.05;
     int64 now;
     int64 last_check;
     int64 ticks = 0;
@@ -95,7 +99,7 @@ int main() {
                 check.Read(r_Msg.buffer);
                 
                 int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
-#ifdef _DEBUG
+#ifdef _DEBUG_EVERY_MESSAGE
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
                 printf(" %dms", ping_ms);
@@ -115,6 +119,13 @@ int main() {
                     case Network::ClientMessageType::Leave:
                         break;
                     case Network::ClientMessageType::Input:
+                        Network::MsgContentInput input_content;
+                        input_content.Read( r_Msg.buffer );
+                        pComm->UpdateLastSeen( input_content.id, r_Msg.timestamp_received_ms );
+
+                        if ( clients.count( input_content.id ) ) {
+                            clients[input_content.id]->input = input_content.input;
+                        }
                         break;
                 } // End switch message type.
 
@@ -124,6 +135,43 @@ int main() {
 
         // Restart timer after tick have passed.
         Timer_ms::timer_start();
+/*
+        for( auto const& cli : clients) {
+
+            if ( cli.second->input.up ) {
+                // DO nothing.
+            }
+            if ( cli.second->input.down ) {
+                // Crouch
+            }
+            if ( cli.second->input.left ) {
+                if ( cli.second->grounded ) {
+                    cli.second->player_state->speed_x = -0.1;
+                }
+            }
+            if ( cli.second->input.right ) {
+                if ( cli.second->grounded ) {
+                    cli.second->player_state->speed_x = 0.1;
+                }
+            }
+            if ( cli.second->input.jump ) {
+                if (cli.second->grounded) {
+                    cli.second->player_state->speed_y = 0.5;
+                }
+            }
+
+            cli.second->player_state->x += cli.second->player_state->speed_x * milliseconds_per_tick;
+            cli.second->player_state->y += cli.second->player_state->speed_y * milliseconds_per_tick;
+            
+            cli.second->player_state->speed_y -= gravitation_y_per_millisecond * milliseconds_per_tick;
+
+            if (cli.second->player_state->y <= 0) {
+                cli.second->player_state->y = 0;
+                cli.second->player_state->speed_y = 0;
+            }
+        }*/
+
+        // Broadcast player states here.
 
         // Check the connection of every client.
         now = timeSinceEpochMillisec();

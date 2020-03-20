@@ -23,7 +23,7 @@ public:
         memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
         Network::send_msg( pSocket, s_Msg);
         
-#ifdef _DEBUG
+#ifdef _DEBUG_EVERY_MESSAGE
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::CliMsgNames[ message_type ]);
@@ -50,6 +50,8 @@ public:
 
         this->id_from_server = msg_content.id;
         this->connected = true;
+
+        printf("[Connected]");
         
     };
 
@@ -64,7 +66,7 @@ public:
 
         }
         else {
-            printf("Received connection message without having an ID.");
+            printf("Received connection message without having an ID.\n");
         }
 
     };

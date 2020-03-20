@@ -1,66 +1,46 @@
 #pragma once
 
 #include "..\include\def.h"
-
+#include "..\include\sperror.h"
 #include "..\include\network.h"
 #include "..\include\network_messages.h"
 #include "..\include\msg_construct_server.h"
-
-#include <map>
-#include <vector>
-
-class Client {
-public:
-    int32 unique_id;
-    SOCKADDR_IN address;
-    
-    int64 last_seen;
-    int64 last_asked;
-
-    Client(int32 unique_id, SOCKADDR_IN address, int32 player_x = 0, int32 player_y = 0)
-    : unique_id(unique_id), address(address)
-    {
-
-        this->last_seen = timeSinceEpochMillisec();
-
-    };
-    ~Client(){};
-
-    void PrintShort() {
-        printf("[id:%d, address: ", unique_id);
-        PrintAddress(this->address);
-        printf("]");
-    }
-};
+#include "..\include\client.h"
 
 class Communication {
     int32 is_running = 1;
 
-    std::map<int32, Client*> clients;
 
     SOCKET* pSocket;
 
-    uint32 lastID = 0;
+    int32 lastID = 0;
 
 public:
 
-    Communication(SOCKET* socket) {
+    ClientMap *clients;
+
+    Communication(SOCKET* socket, std::map<int32, Client*> *clients) {
         this->pSocket = socket;
+        this->clients = clients;
     };
     
-    uint32 NextUniqueID(){
+    int32 UniqueID(){
         lastID += 1;
+        return lastID;
+    };
+
+    int32 GetLastID() {
         return lastID;
     };
     
     uint32 AmountOfConnectedClients() {
-        return clients.size();
+        return clients->size();
     }
 
     void PrintClients() {
 
-        printf("%d registered clients:", clients.size());
-        for(auto const& cli : clients) {
+        printf("%d registered clients:", clients->size());
+        for(auto const& cli : *clients) {
             cli.second->PrintShort();
         }
 
@@ -73,7 +53,7 @@ public:
         
         Network::send_msg( pSocket, s_Msg );
         
-#ifdef _DEBUG
+#ifdef _DEBUG_EVERY_MESSAGE
         printf("[ To   ");
         PrintAddress(s_Msg.address);
         printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
@@ -81,23 +61,31 @@ public:
 
     };
 
+    void UpdateLastSeen(int32 id, int64 time) {
+
+        if ( clients->count( id )) {
+            (*clients)[ id ]->last_seen = time;
+        }
+
+    }
+
     void RemoveClientFromList(int32 id) {
 
-        if ( clients.count( id ) ) {
+        if ( clients->count( id ) ) {
             printf("Removed client " );
-            clients[id]->PrintShort();
+            (*clients)[id]->PrintShort();
             printf(".\n");
-            clients[id]->~Client();
-            clients.erase( id );
+            (*clients)[id]->~Client();
+            (*clients).erase( id );
         }
 
     };
 
     void KickClient(int32 id) {
         
-        if ( clients.count( id ) ) {
+        if ( clients->count( id ) ) {
             Network::Message s_Msg;
-            s_Msg.SetAddress( clients[id]->address );
+            s_Msg.SetAddress( (*clients)[id]->address );
             Network::Construct::kicked( s_Msg );
             this->Send( s_Msg );
         }
@@ -107,20 +95,21 @@ public:
     void ConnectionRequestToClient(int32 id) {
 
         Network::Message s_Msg;
-        s_Msg.SetAddress( clients[id]->address );
+        s_Msg.SetAddress( (*clients)[id]->address );
         Network::Construct::connection( s_Msg, id );
         this->Send( s_Msg );
 
     };
+
 
     void CheckConnection() {
         
         uint64 now = timeSinceEpochMillisec();
         int64 time_since;
 
-        std::vector<int64> clients_to_kick;
+        std::vector<int32> clients_to_kick;
 
-        for(auto const& cli : clients) {
+        for(auto const& cli : *clients) {
 
             time_since = now - cli.second->last_seen;
             if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
@@ -146,21 +135,13 @@ public:
 
     };
 
-    void ConnectionThreadCheck() {
-
-        for(ever) {
-            this->CheckConnection();
-        }
-
-    };
-
     void MessageConnection(Network::Message& r_Msg) {
 
         Network::MsgContentID msg_content;
         msg_content.Read( r_Msg.buffer );
         
-        if ( clients.count( msg_content.id ) ) {
-            clients[ msg_content.id ]->last_seen = timeSinceEpochMillisec();
+        if ( clients->count( msg_content.id ) ) {
+            (*clients)[ msg_content.id ]->last_seen = timeSinceEpochMillisec();
         }
 
     };
@@ -175,7 +156,7 @@ public:
         // This is the id we will pass back and forth.
         // This will carry over to when we receive MSGTYPE_REGISTERACK
         // and becomes the id for that client.
-        uint32 id = this->NextUniqueID();
+        uint32 id = this->UniqueID();
         Network::Construct::register_syn(s_Msg, id);
         this->Send(s_Msg);
 
@@ -199,15 +180,15 @@ public:
             Network::Construct::register_result( s_Msg, msg_content.id );
             s_Msg.SetAddress(r_Msg.address);
             this->Send(s_Msg);
-
+            
             Client* new_client = new Client(msg_content.id, r_Msg.address);
-            this->clients.insert(std::make_pair(msg_content.id, new_client));
-
+            clients->insert(std::make_pair(msg_content.id, new_client));
+            
             printf("Registering client: %d", msg_content.id);
             new_client->PrintShort();
             printf("\n");
 
         }
-    }
+    };
 
 };

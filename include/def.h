@@ -4,7 +4,7 @@
 #endif
 
 #define ever ;;
-#define _DEBUG
+#define _DEBUG_EVERY_MESSAGE
 
 #define NO_ID_GIVEN -1
 
@@ -33,3 +33,6 @@ constexpr int32 MAX_CLIENTS_CONNECTED = 32;
 
 constexpr int32 SERVER_TICK_RATE = 120;
 constexpr int32 CLIENT_TICK_RATE = 120;
+
+constexpr float32 window_coord_width = 1000;
+constexpr float32 window_coord_height = 1000;

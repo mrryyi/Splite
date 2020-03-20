@@ -24,10 +24,33 @@ static void write_uint32(uint8** buffer, uint32 ui32) {
     *buffer += sizeof( ui32 );
 };
 
+static void write_int32(uint8** buffer, int32 i32) {
+    // Same concept as write_uint8(), except we cannot do do a simple
+    // assignment of the content to the spot. We need to define how to 
+    // copy over the data, which memcpy does for us.
+    memcpy(*buffer, &i32, sizeof( i32 ));
+    *buffer += sizeof( i32 );
+};
+
+
 static void write_uint64(uint8** buffer, uint64 ui64) {
-    // ditto write_uint32()
     memcpy(*buffer, &ui64, sizeof( ui64 ));
     *buffer += sizeof( ui64 );
+};
+
+static void write_int64(uint8** buffer, int64 i64) {
+    memcpy(*buffer, &i64, sizeof( i64 ));
+    *buffer += sizeof( i64 );
+};
+
+static void write_float32(uint8** buffer, float32 f32) {
+    memcpy(*buffer, &f32, sizeof( f32 ));
+    *buffer += sizeof( f32 );
+};
+
+static void write_float64(uint8** buffer, float64 f64) {
+    memcpy(*buffer, &f64, sizeof( f64 ));
+    *buffer += sizeof( f64 );
 };
 
 static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
@@ -38,7 +61,6 @@ static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
     //  left   .... .l..     << 2
     //  right  .... r...     << 3
     //  jump   ...j ....     << 4
-    
     uint8 compressed_input = 
         (uint8)(input->up   ? 1 << 0 : 0) |
         (uint8)(input->down ? 1 << 1 : 0) |
@@ -63,13 +85,37 @@ static void read_uint32(uint8** buffer, uint32* ui32) {
     *buffer += sizeof( ui32 );
 };
 
+static void read_int32(uint8** buffer, int32* i32) {
+    // *buffer means the address of the value we want to start at.
+    // We read bytes equal to the third argument.
+    memcpy(i32, *buffer, sizeof( i32 ));
+    *buffer += sizeof( i32 );
+};
+
 static void read_uint64(uint8** buffer, uint64* ui64) {
     memcpy(ui64, *buffer, sizeof( ui64 ));
     *buffer += sizeof( ui64 );
 };
 
+static void read_int64(uint8** buffer, int64* i64) {
+    memcpy(i64, *buffer, sizeof( i64 ));
+    *buffer += sizeof( i64 );
+};
+
+static void read_float64(uint8** buffer, float64* f64) {
+    memcpy(f64, *buffer, sizeof( f64 ));
+    *buffer += sizeof( f64 );
+};
+
+static void read_float32(uint8** buffer, float32* f32) {
+    // *buffer means the address of the value we want to start at.
+    // We read bytes equal to the third argument.
+    memcpy(f32, *buffer, sizeof( f32 ));
+    *buffer += sizeof( f32 );
+};
+
 static void read_player_input(uint8** buffer, Player::PlayerInput* input) {
-    uint8 compressed;
+    uint8 compressed = 0;
     read_uint8(buffer, &compressed);
     
     // Assign values to separate variables from compressed byte.

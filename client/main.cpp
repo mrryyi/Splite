@@ -106,6 +106,8 @@ int main() {
 
     bool running = true;
 
+    std::vector<Player::PlayerState> player_states;
+
     while( running ) {
 
         while ( Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick) {
@@ -123,7 +125,7 @@ int main() {
                 check.Read( r_Msg.buffer );
 
                 int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
-#ifdef _DEBUG
+#ifdef _DEBUG_EVERY_MESSAGE
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
                 printf(" %dms", ping_ms);
@@ -142,6 +144,8 @@ int main() {
                         break;
                     case Network::ServerMessageType::GameState:
                         pCommunication->MessageGameState(r_Msg);
+                        break;
+                    case Network::ServerMessageType::PlayerStates:
                         break;
                     case Network::ServerMessageType::Kicked:
                         pCommunication->MessageKicked(r_Msg);
@@ -167,41 +171,42 @@ int main() {
             }
         }
         
-        if ( (bool8) 0 && pCommunication->connected ) {
-            // get input
-            //userInput = getchar();
+        if ( pCommunication->connected ) {
 
-            input.up = (uint8) (userInput == 'w') ? 1 : 0; 
-            input.down = (uint8) (userInput == 's') ? 1 : 0;
-            input.left = (uint8) (userInput == 'a') ? 1 : 0;
-            input.right = (uint8) (userInput == 'd') ? 1 : 0;
-            input.jump = (uint8) (userInput == 'j') ? 1 : 0;
-            
+            input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
+            input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
+            input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
+            input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
+            input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
 
             Network::Message s_Msg;
             Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
+
+            Network::MsgContentInput inputrr;
+            inputrr.Read(s_Msg.buffer);
+            printf("[input up: %d]", input.up);
             s_Msg.SetAddress(server_address);
             pCommunication->Send(s_Msg);
+
         }
 
         // Update physics
         // TODO: ADD PHYSICS
-        
 
         // Update graphics
         // Should take in a gamestate object.
         now = timeSinceEpochMillisec();
         if (now - last_frame_ms >= milliseconds_per_frame) {
-            graphics_handle.Update();
+            graphics_handle.Update( player_states );
             last_frame_ms = now;
         }
     }
 
-    printf("Exiting program normally...");
+    printf("Exiting program normally...\n");
 
     fr = graphics::terminate();
     if (fr) {
-        printf("Couldn't terminate graphics");
+        printf("Couldn't terminate graphics.\n");
     }
 
     delete pCommunication;

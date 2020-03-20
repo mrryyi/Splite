@@ -5,6 +5,7 @@
 #include "network.h"
 #include "network_messages.h"
 #include "message_types.h"
+#include "client.h"
 
 namespace Network
 {
@@ -18,8 +19,8 @@ namespace Network
         msg_content.timestamp_ms = timeSinceEpochMillisec();
         msg_content.Write( msg.buffer );
         msg.bufferLength = msg_content.sizeof_content();
-    }
-    
+    };
+
     void register_syn(Message& msg, uint32 id) {
 
         MsgContentID msg_content;
@@ -61,7 +62,7 @@ namespace Network
         msg_content.Write( msg.buffer );
         msg.bufferLength = msg_content.sizeof_content();
         
-    }
+    };
 
     }; // End namespace Construct
 }; // End namespace Network
