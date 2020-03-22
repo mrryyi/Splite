@@ -18,7 +18,7 @@ struct PlayerInput
     };
 
     const static size_t sizeof_content() {
-        return sizeof( bool8 ) * 5;
+        return sizeof( uint8 ) * 5;
     };
 };
 
