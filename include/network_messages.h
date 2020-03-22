@@ -65,7 +65,7 @@ public:
         write_uint8(&iterator, message_type);
         write_uint64(&iterator, timestamp_ms);
         write_uint32(&iterator, id);
-        write_player_input(&iterator, &input);
+        write_player_input_verbose(&iterator, &input);
     };
 
     void Read(uint8* buffer) {
@@ -73,7 +73,7 @@ public:
         read_uint8(&iterator, &message_type);
         read_uint64(&iterator, &timestamp_ms);
         read_uint32(&iterator, &id);
-        read_player_input(&iterator, &input);
+        read_player_input_verbose(&iterator, &input);
     };
     
     const size_t sizeof_content() {
@@ -81,7 +81,7 @@ public:
         return sizeof( message_type ) +
                sizeof( timestamp_ms ) +
                sizeof( id ) + 
-               sizeof( bool8 );
+               Player::PlayerInput::sizeof_content();
     };
 };
 

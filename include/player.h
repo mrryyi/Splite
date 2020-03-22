@@ -16,6 +16,10 @@ struct PlayerInput
         right = p.right;
         jump = p.jump;
     };
+
+    const static size_t sizeof_content() {
+        return sizeof( bool8 ) * 5;
+    };
 };
 
 class PlayerState {
