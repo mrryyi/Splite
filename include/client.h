@@ -21,6 +21,7 @@ public:
     {
 
         this->last_seen = timeSinceEpochMillisec();
+        player_state = new Player::PlayerState;
 
     };
     ~Client(){};
