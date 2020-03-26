@@ -89,7 +89,7 @@ int main() {
 
     constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
     constexpr float32 acceleration_per_millisecond = 0.5;
-    constexpr float32 gravitation_y_per_millisecond = 0.05;
+    constexpr float32 gravitation_y_per_millisecond = 0.003;
     int64 now;
     int64 last_check;
     int64 ticks = 0;
@@ -270,6 +270,9 @@ int main() {
                 cli_p->player_state->y = 0;
                 cli_p->player_state->speed_y = 0;
                 cli_p->grounded = 1;
+            }
+            else {
+                cli_p->grounded = 0;
             }
             printf("[player:%d x:%f y:%f]", cli_p->unique_id, cli_p->player_state->x, cli_p->player_state->y);
 
