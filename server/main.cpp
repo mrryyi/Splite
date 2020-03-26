@@ -188,13 +188,13 @@ int main() {
                         
                         int32 read_index = 0;
                         uint8 type;
-                        uint64 fuck;
+                        uint64 timestamp;
                         uint32 id;
 
                         memcpy(&type, &r_Msg.buffer[read_index], sizeof( type ));
                         read_index += sizeof( type );
-                        memcpy(&fuck, &r_Msg.buffer[read_index], sizeof( fuck ));
-                        read_index += sizeof( fuck );
+                        memcpy(&timestamp, &r_Msg.buffer[read_index], sizeof( timestamp ));
+                        read_index += sizeof( timestamp );
                         memcpy(&id, &r_Msg.buffer[read_index], sizeof( id ));
                         read_index += sizeof( id );
                         
