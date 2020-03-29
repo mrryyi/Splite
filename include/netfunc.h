@@ -89,37 +89,37 @@ static void read_uint8(uint8** buffer, uint8* ui8) {
 static void read_uint32(uint8** buffer, uint32* ui32) {
     // *buffer means the address of the value we want to start at.
     // We read bytes equal to the third argument.
-    memcpy(ui32, *buffer, sizeof( ui32 ));
-    *buffer += sizeof( ui32 );
+    memcpy(ui32, *buffer, sizeof( *ui32 ));
+    *buffer += sizeof( *ui32 );
 };
 
 static void read_int32(uint8** buffer, int32* i32) {
     // *buffer means the address of the value we want to start at.
     // We read bytes equal to the third argument.
-    memcpy(i32, *buffer, sizeof( i32 ));
-    *buffer += sizeof( i32 );
+    memcpy(i32, *buffer, sizeof( *i32 ));
+    *buffer += sizeof( *i32 );
 };
 
 static void read_uint64(uint8** buffer, uint64* ui64) {
-    memcpy(ui64, *buffer, sizeof( ui64 ));
-    *buffer += sizeof( ui64 );
+    memcpy(ui64, *buffer, sizeof( *ui64 ));
+    *buffer += sizeof( *ui64 );
 };
 
 static void read_int64(uint8** buffer, int64* i64) {
-    memcpy(i64, *buffer, sizeof( i64 ));
-    *buffer += sizeof( i64 );
+    memcpy(i64, *buffer, sizeof( *i64 ));
+    *buffer += sizeof( *i64 );
 };
 
 static void read_float64(uint8** buffer, float64* f64) {
-    memcpy(f64, *buffer, sizeof( f64 ));
-    *buffer += sizeof( f64 );
+    memcpy(f64, *buffer, sizeof( *f64 ));
+    *buffer += sizeof( *f64 );
 };
 
 static void read_float32(uint8** buffer, float32* f32) {
     // *buffer means the address of the value we want to start at.
     // We read bytes equal to the third argument.
-    memcpy(f32, *buffer, sizeof( f32 ));
-    *buffer += sizeof( f32 );
+    memcpy(f32, *buffer, sizeof( *f32 ));
+    *buffer += sizeof( *f32 );
 };
 
 static void read_player_input(uint8** buffer, Player::PlayerInput* input) {

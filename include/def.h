@@ -34,5 +34,10 @@ constexpr int32 MAX_CLIENTS_CONNECTED = 32;
 constexpr int32 SERVER_TICK_RATE = 30;
 constexpr int32 CLIENT_TICK_RATE = 120;
 
+
+constexpr float32 milliseconds_per_tick = 1000 / SERVER_TICK_RATE;
+constexpr float32 acceleration_per_millisecond = 0.5;
+constexpr float32 gravitation_y_per_millisecond = 0.003;
+
 constexpr float32 window_coord_width = 1000;
 constexpr float32 window_coord_height = 1000;
