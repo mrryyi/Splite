@@ -228,7 +228,8 @@ int main() {
 
         // Restart timer after tick have passed.
         Timer_ms::timer_start();
-        
+
+        // Basically, when we are done with the physics, we receive messages to apply to the next tick.
         for( auto const& cli : clients) {
 
             Client* cli_p = cli.second;
@@ -241,40 +242,39 @@ int main() {
             }
             if ( cli_p->input.left ) {
                 if ( cli_p->grounded ) {
-                    cli_p->player_state->speed_x = -0.1;
+                    cli_p->player_state.speed_x = -0.1;
                 }
                 else {
-                    cli_p->player_state->speed_x = 0.0;
+                    cli_p->player_state.speed_x = 0.0;
                 }
             }
             if ( cli_p->input.right ) {
                 if ( cli_p->grounded ) {
-                    cli_p->player_state->speed_x = 0.1;
+                    cli_p->player_state.speed_x = 0.1;
                 }
                 else {
-                    cli_p->player_state->speed_x = 0.0;
+                    cli_p->player_state.speed_x = 0.0;
                 }
             }
             if ( cli_p->input.jump ) {
                 if (cli_p->grounded) {
-                    cli_p->player_state->speed_y = 0.5;
+                    cli_p->player_state.speed_y = 0.5;
                 }
             }
 
-            cli_p->player_state->x += cli_p->player_state->speed_x * milliseconds_per_tick;
-            cli_p->player_state->y += cli_p->player_state->speed_y * milliseconds_per_tick;
+            cli_p->player_state.x += cli_p->player_state.speed_x * milliseconds_per_tick;
+            cli_p->player_state.y += cli_p->player_state.speed_y * milliseconds_per_tick;
             
-            cli.second->player_state->speed_y -= gravitation_y_per_millisecond * milliseconds_per_tick;
+            cli_p->player_state.speed_y -= gravitation_y_per_millisecond * milliseconds_per_tick;
 
-            if (cli_p->player_state->y <= 0) {
-                cli_p->player_state->y = 0;
-                cli_p->player_state->speed_y = 0;
+            if (cli_p->player_state.y <= 0) {
+                cli_p->player_state.y = 0;
+                cli_p->player_state.speed_y = 0;
                 cli_p->grounded = 1;
             }
             else {
                 cli_p->grounded = 0;
             }
-            printf("[player:%d x:%f y:%f]", cli_p->unique_id, cli_p->player_state->x, cli_p->player_state->y);
 
             cli.second->input = empty_player_input;
         }
@@ -289,6 +289,7 @@ int main() {
             for(auto const& cli : clients) {
 
                 time_since = now - cli.second->last_seen;
+
                 if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
                     clients_to_kick.push_back( cli.first );
                 }
@@ -296,7 +297,6 @@ int main() {
                 // If we've already asked within this interval, don't spam the client.
                 else if ( time_since >= INTERVAL_CHECK_CLIENT_MS &&
                         (now - cli.second->last_asked) >= INTERVAL_CHECK_CLIENT_MS) {
-                    
                     Network::Message s_Msg;
                     s_Msg.SetAddress( clients[ cli.second->unique_id ]->address );
                     Network::Construct::connection( s_Msg, cli.second->unique_id );
@@ -335,6 +335,31 @@ int main() {
         }; // End connection handling.
 
         // Broadcast player states here.
+        
+        if (clients.size() > 0) {
+
+            Network::Message s_Msg;
+            Network::MsgContentPlayerStates msg_content;
+            msg_content.message_type = Network::ServerMessageType::PlayerStates;
+            msg_content.timestamp_ms = timeSinceEpochMillisec();
+            std::vector<Player::PlayerState*> player_states;
+
+            for( auto const& cli : clients) {
+
+                player_states.push_back( &cli.second->player_state );
+
+            }
+            msg_content.Write( s_Msg.buffer, player_states );
+            
+            s_Msg.bufferLength = msg_content.sizeof_content();
+
+            for( auto const& cli : clients) {
+                s_Msg.SetAddress( cli.second->address );
+                Send( &sock, s_Msg );
+            }
+
+        }
+        
 
     }; // End main loop.
     

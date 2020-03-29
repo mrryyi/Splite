@@ -71,7 +71,7 @@ public:
     }
 
     // Updates graphics.
-    FRESULT Update(std::vector<Player::PlayerState> player_states) {
+    FRESULT Update(std::vector<Player::PlayerState*> player_states) {
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -94,7 +94,7 @@ public:
             float32 player_height = 10.0;
 
             for(int i = 0; i < player_states.size(); i++) {
-                Rect_w rect = Rect_w(player_states[i].x, player_states[i].y, player_width, player_height);
+                Rect_w rect = Rect_w(player_states[i]->x, player_states[i]->y, player_width, player_height);
                 rect.render();
             }
             

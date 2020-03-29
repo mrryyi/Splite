@@ -106,7 +106,7 @@ int main() {
 
     bool running = true;
 
-    std::vector<Player::PlayerState> player_states;
+    std::vector<Player::PlayerState*> player_states;
 
     while( running ) {
 
@@ -125,12 +125,14 @@ int main() {
                 check.Read( r_Msg.buffer );
 
                 int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
-#ifdef _DEBUG_EVERY_MESSAGE
+                
+                #ifdef _DEBUG_EVERY_MESSAGE
                 printf("[ From ");
                 PrintAddress(r_Msg.address);
                 printf(" %dms", ping_ms);
                 printf(" %s]\n", Network::SrvMsgNames[ check.message_type ]);
-#endif
+                #endif
+
                 switch ( (Network::ServerMessageType) check.message_type )
                 {
                     case Network::ServerMessageType::RegisterSyn:
@@ -146,6 +148,15 @@ int main() {
                         pCommunication->MessageGameState(r_Msg);
                         break;
                     case Network::ServerMessageType::PlayerStates:
+                    {
+                        player_states.clear();
+
+                        Network::MsgContentPlayerStates msg_content;
+                        msg_content.Read( r_Msg.buffer, player_states );
+
+                        Player::print_player_states( player_states );
+                    
+                    }   
                         break;
                     case Network::ServerMessageType::Kicked:
                         pCommunication->MessageKicked(r_Msg);
@@ -181,14 +192,11 @@ int main() {
             input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
             input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
 
-            // If input is new
+            // If input is new, send new input.
             if ( old_input != input ) {
                 Network::Message s_Msg;
                 Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
 
-                Network::MsgContentInput inputrr;
-                inputrr.Read(s_Msg.buffer);
-                printf("[input up: %d]", input.up);
                 s_Msg.SetAddress(server_address);
                 pCommunication->Send(s_Msg);
             }

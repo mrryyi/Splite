@@ -13,15 +13,17 @@ public:
     int64 last_asked;
 
     bool8 grounded = true;
-    Player::PlayerState* player_state;
+    Player::PlayerState player_state;
     Player::PlayerInput input;
 
-    Client(int32 unique_id, SOCKADDR_IN address, int32 player_x = 0, int32 player_y = 0)
+    Client(int32 unique_id, SOCKADDR_IN address, float64 player_x = 0, float64 player_y = 0)
     : unique_id(unique_id), address(address)
     {
 
         this->last_seen = timeSinceEpochMillisec();
-        player_state = new Player::PlayerState;
+        this->last_asked = this->last_seen;
+        this->player_state = Player::PlayerState();
+        this->player_state.id = unique_id;
 
     };
     ~Client(){};

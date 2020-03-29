@@ -2,6 +2,7 @@
 
 #include "pre.h"
 #include "netfunc.h"
+#include "client.h"
 
 namespace Network
 {
@@ -85,59 +86,71 @@ public:
     };
 };
 
+#define NOT_SET_YET -1
+
 class MsgContentPlayerStates : public MsgContentBase {
 public:
-    
-    std::vector<Player::PlayerState*> player_states;
 
-    void Write( uint8* buffer) {
+    uint8 player_amount = NOT_SET_YET;
+    
+    void Write( uint8* buffer, std::vector<Player::PlayerState*> param_states ) {
         uint8* iterator = buffer;
         write_uint8(&iterator, message_type);
         write_uint64(&iterator, timestamp_ms);
-        uint8 amount_of_players = player_states.size();
-        write_uint8(&iterator, amount_of_players);
+        player_amount = param_states.size();
+        write_uint8(&iterator, player_amount);
 
-        for(int i = 0; i < player_states.size(); i++) {
-            write_int32(&iterator, player_states[i]->id);
-            write_float64(&iterator, player_states[i]->x);
-            write_float64(&iterator, player_states[i]->y);
-            write_float32(&iterator, player_states[i]->speed_x);
-            write_float32(&iterator, player_states[i]->speed_y);
+        for(int i = 0; i < param_states.size(); i++) {
+            write_int64(&iterator, param_states[i]->id);
+            write_float64(&iterator, param_states[i]->x);
+            write_float64(&iterator, param_states[i]->y);
+            write_float32(&iterator, param_states[i]->speed_x);
+            write_float32(&iterator, param_states[i]->speed_y);
         }
+
     }
 
-    void Read( uint8* buffer ) {
+    void Read( uint8* buffer, std::vector<Player::PlayerState*>& param_states) {
         uint8* iterator = buffer;
         read_uint8(&iterator, &message_type);
         read_uint64(&iterator, &timestamp_ms);
-        uint8 amount_of_players;
-        read_uint8(&iterator, &amount_of_players);
+        read_uint8(&iterator, &player_amount);
         
-        for(int i = 0; i < amount_of_players; i++) {
+        for(int i = 0; i < player_amount; i++) {
             Player::PlayerState* player = new Player::PlayerState();
 
-            read_int32(&iterator, &player->id);
+            read_int64(&iterator, &player->id);
             read_float64(&iterator, &player->x);
             read_float64(&iterator, &player->y);
             read_float32(&iterator, &player->speed_x);
             read_float32(&iterator, &player->speed_y);
-            player_states.push_back(player);
+            param_states.push_back( player );
+
         }
     }
 
     const size_t sizeof_content() {
-        size_t size;
 
-        size += sizeof( message_type );
-        size += sizeof( timestamp_ms);
-        size += sizeof( uint8 ); // amount_of_players;
-        for(int i = 0; i < player_states.size(); i++) {
-            // Size of id + x + y.
-            size += sizeof( int32 ) + sizeof( float64 ) + sizeof( float64 );
-            size += sizeof( float32 ) + sizeof( float32 );
+        if ( player_amount != NOT_SET_YET ){
+                
+            size_t size = 0;
+
+            size += sizeof( message_type );
+            size += sizeof( timestamp_ms);
+            size += sizeof( uint8 ); // amount_of_players;
+            
+            for(int i = 0; i < player_amount; i++) {
+                // Size of id + x + y + speed_x + speed_y
+                size += Player::PlayerState::sizeof_content();
+            }
+
+            return size;
         }
-        return size;
-    }
+        else {
+            exit(EXIT_FAILURE);
+        }
+
+    };
 
 };
 
