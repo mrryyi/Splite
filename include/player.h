@@ -21,6 +21,18 @@ struct PlayerInput
         jump = p.jump;
     };
 
+    bool8 operator ==(const PlayerInput &p) {
+        return  (up == p.up)       && 
+                (down == p.down)   &&
+                (left == p.left)   &&
+                (right == p.right) &&
+                (jump == p.jump);
+    };
+
+    bool8 operator !=(const PlayerInput &p) {
+        return !(*this == p);
+    };
+
     const static size_t sizeof_content() {
         return sizeof( uint8 ) * 5;
     };

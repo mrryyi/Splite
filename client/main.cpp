@@ -173,21 +173,25 @@ int main() {
         
         if ( pCommunication->connected ) {
 
+            Player::PlayerInput old_input = input;
+
             input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
             input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
             input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
             input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
             input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
 
-            Network::Message s_Msg;
-            Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
+            // If input is new
+            if ( old_input != input ) {
+                Network::Message s_Msg;
+                Network::Construct::player_input(s_Msg, pCommunication->id_from_server, input);
 
-            Network::MsgContentInput inputrr;
-            inputrr.Read(s_Msg.buffer);
-            printf("[input up: %d]", input.up);
-            s_Msg.SetAddress(server_address);
-            pCommunication->Send(s_Msg);
-
+                Network::MsgContentInput inputrr;
+                inputrr.Read(s_Msg.buffer);
+                printf("[input up: %d]", input.up);
+                s_Msg.SetAddress(server_address);
+                pCommunication->Send(s_Msg);
+            }
         }
 
         // Update physics
