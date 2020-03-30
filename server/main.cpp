@@ -10,22 +10,6 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-
-void Send(SOCKET* socket, Network::Message& s_Msg){
-
-        uint8 message_type;
-        memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-        
-        Network::send_msg( socket, s_Msg );
-        
-#ifdef _DEBUG_EVERY_MESSAGE
-        printf("[ To   ");
-        PrintAddress(s_Msg.address);
-        printf(" %s]\n", Network::SrvMsgNames[ message_type ]);
-#endif
-
-    };
-
 int main() {
     
     // Forces stdout to be line-buffered.
@@ -95,270 +79,58 @@ int main() {
     bool8 running = true;
     Timer_ms::timer_start();
 
-    while( running ) {
-        ticks++;
-        while (Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick)
-        {
+    char buffer[SOCKET_BUFFER_SIZE];
+    int flags = 0;
+    SOCKADDR_IN from;
+    int from_size = sizeof( from );
 
-            int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
+    uint32 msg_size;
 
-            if( bytes_received != SOCKET_ERROR )
-            {
+    while ( running ) {
+        while( Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick) {
 
-                Network::Message r_Msg;
-                r_Msg.address = from;
-                r_Msg.address_size = from_size;
-                r_Msg.timestamp_received_ms = timeSinceEpochMillisec();
-                memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
+            uint32 bytes_received;
 
-                // The type of message may vary the length of the buffer content,
-                // but MsgContentBase::ReadBuffer is smart and only reads about 
-                // the members it has. It stops at msg_type and timestamp_ms
-                Network::MsgContentBase check;
-                check.Read(r_Msg.buffer);
-                
-                int64 ping_ms = r_Msg.timestamp_received_ms - (int64) check.timestamp_ms;
+            Network::Message r_Msg;
 
-                #ifdef _DEBUG_EVERY_MESSAGE
-                printf("[ From ");
-                PrintAddress(r_Msg.address);
-                printf(" %dms", ping_ms);
-                printf(" %s]\n", Network::CliMsgNames[ check.message_type ]);
-                #endif
-
-                switch((Network::ClientMessageType) check.message_type )
-                {
+            bytes_received = recvfrom( sock, (char*) r_Msg.buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
+            
+            if ( bytes_received != SOCKET_ERROR ) {
+                switch ( (Network::ClientMessageType) r_Msg.buffer[0] ){
                     case Network::ClientMessageType::RegisterRequest:
                     {
 
+                        uint32 id_for_client = ++lastID;
                         Network::Message s_Msg;
-                        s_Msg.SetAddress(r_Msg.address);
-                        // This is the id we will pass back and forth.
-                        // This will carry over to when we receive MSGTYPE_REGISTERACK
-                        // and becomes the id for that client.
-                        Network::Construct::register_syn(s_Msg, ++lastID);
-                        Send( &sock, s_Msg );
+                        msg_size = Network::server_msg_syn_write( s_Msg.buffer, id_for_client );
+                        Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
-                        break;
+                    break;
                     case Network::ClientMessageType::RegisterAck:
                     {
 
+                        uint8 yes_no = false;
+
                         if ( clients.size() < MAX_CLIENTS_CONNECTED ) {
-
-                            Network::MsgContentID msg_content;
-                            msg_content.Read(r_Msg.buffer);
-
-                            Network::Message s_Msg;
-                            Network::Construct::register_result( s_Msg, msg_content.id );
-                            s_Msg.SetAddress(r_Msg.address);
-                            Send( &sock, s_Msg );
-                            
-                            Client* new_client = new Client( msg_content.id, r_Msg.address );
-                            
-                            clients.insert(std::make_pair( msg_content.id, new_client ));
-                            
-                            printf("Registering client: %d", msg_content.id);
-                            new_client->PrintShort();
-                            printf("\n");
-
+                            yes_no = true;
                         }
 
-                    }
-                        break;
-                    case Network::ClientMessageType::ConnectionResponse:
-                    {
-
-                        Network::MsgContentID msg_content;
-                        msg_content.Read( r_Msg.buffer );
-                        
-                        if ( clients.count( msg_content.id ) ) {
-                            clients[ msg_content.id ]->last_seen = timeSinceEpochMillisec();
-                        }
+                        Network::Message s_Msg;
+                        msg_size = Network::server_msg_register_result_write( s_Msg.buffer, yes_no );
+                        Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
-                        break;
-                    case Network::ClientMessageType::Leave:
-                        break;
-                    case Network::ClientMessageType::Input:
-                    {
-                        
-                        int32 read_index = 0;
-                        uint8 type;
-                        uint64 timestamp;
-                        uint32 id;
+                    break;
+                    default:
+                    break;
+                } // End switch
+            } // End if bytes_received is not socket error
+        } // End while tick not complete
 
-                        memcpy(&type, &r_Msg.buffer[read_index], sizeof( type ));
-                        read_index += sizeof( type );
-                        memcpy(&timestamp, &r_Msg.buffer[read_index], sizeof( timestamp ));
-                        read_index += sizeof( timestamp );
-                        memcpy(&id, &r_Msg.buffer[read_index], sizeof( id ));
-                        read_index += sizeof( id );
-                        
-                        if ( clients.count( id ) ) {
-
-                            Player::PlayerInput input;
-
-                            memcpy(&input.up, &r_Msg.buffer[read_index], sizeof( input.up ));
-                            read_index += sizeof( input.up );
-                            memcpy(&input.down, &r_Msg.buffer[read_index], sizeof( input.down ));
-                            read_index += sizeof( input.down );
-                            memcpy(&input.left, &r_Msg.buffer[read_index], sizeof( input.left ));
-                            read_index += sizeof( input.left );
-                            memcpy(&input.right, &r_Msg.buffer[read_index], sizeof( input.right ));
-                            read_index += sizeof( input.right );
-                            memcpy(&input.jump, &r_Msg.buffer[read_index], sizeof( input.jump ));
-                            read_index += sizeof( input.jump );
-                        
-                            clients[ id ]->last_seen = timeSinceEpochMillisec();
-                            clients[ id ]->input = input;
-                            
-                        }
-
-                    }
-                        break;
-                } // End switch message type.
-
-            } // End if socket recv from.
-
-        } // End while timer not reached ms per tick.
-
-        // Restart timer after tick have passed.
         Timer_ms::timer_start();
-
-        // Basically, when we are done with the physics, we receive messages to apply to the next tick.
-        for( auto const& cli : clients) {
-
-            Client* cli_p = cli.second;
-
-            if ( cli_p->input.up ) {
-                // DO nothing.
-            }
-            if ( cli_p->input.down ) {
-                // Crouch
-            }
-            if ( cli_p->input.left ) {
-                if ( cli_p->grounded ) {
-                    cli_p->player_state.speed_x = -0.1;
-                }
-                else {
-                    cli_p->player_state.speed_x = 0.0;
-                }
-            }
-            if ( cli_p->input.right ) {
-                if ( cli_p->grounded ) {
-                    cli_p->player_state.speed_x = 0.1;
-                }
-                else {
-                    cli_p->player_state.speed_x = 0.0;
-                }
-            }
-            if ( cli_p->input.jump ) {
-                if (cli_p->grounded) {
-                    cli_p->player_state.speed_y = 0.5;
-                }
-            }
-
-            cli_p->player_state.x += cli_p->player_state.speed_x * milliseconds_per_tick;
-            cli_p->player_state.y += cli_p->player_state.speed_y * milliseconds_per_tick;
-            
-            cli_p->player_state.speed_y -= gravitation_y_per_millisecond * milliseconds_per_tick;
-
-            if (cli_p->player_state.y <= 0) {
-                cli_p->player_state.y = 0;
-                cli_p->player_state.speed_y = 0;
-                cli_p->grounded = 1;
-            }
-            else {
-                cli_p->grounded = 0;
-            }
-
-            cli.second->input = empty_player_input;
-        }
-
-        // Check the connection of every client.
-        now = timeSinceEpochMillisec();
-        if ( (now - last_check) >= INTERVAL_CHECK_CLIENTS_MS) {
-
-            int64 time_since;
-            std::vector<uint32> clients_to_kick;
-
-            for(auto const& cli : clients) {
-
-                time_since = now - cli.second->last_seen;
-
-                if ( time_since >= MAX_TIME_UNHEARD_FROM_MS ) {
-                    clients_to_kick.push_back( cli.first );
-                }
-                // Ask only if either time_since surpassed the interval to check.
-                // If we've already asked within this interval, don't spam the client.
-                else if ( time_since >= INTERVAL_CHECK_CLIENT_MS &&
-                        (now - cli.second->last_asked) >= INTERVAL_CHECK_CLIENT_MS) {
-                    Network::Message s_Msg;
-                    s_Msg.SetAddress( clients[ cli.second->unique_id ]->address );
-                    Network::Construct::connection( s_Msg, cli.second->unique_id );
-                    Send( &sock, s_Msg );
-                    cli.second->last_asked = now;
-                };
-
-            };
-
-            uint32 cli_id;
-            // So that we don't segfault by removing clients inside
-            // the iteration above lol.
-            for(int i = 0; i < clients_to_kick.size(); i++) {
-                cli_id = clients_to_kick[i];
-
-                if ( clients.count( cli_id ) ) {
-
-                    // Attempting to inform player that they are kicked.
-                    Network::Message s_Msg;
-                    s_Msg.SetAddress( clients[ cli_id ]->address );
-                    Network::Construct::kicked( s_Msg );
-                    Send( &sock, s_Msg );
-
-                    // Removing client from list.
-                    printf("Removed client " );
-                    clients[ cli_id ]->PrintShort();
-                    printf(".\n");
-                    clients[ cli_id ]->~Client();
-                    clients.erase( cli_id );
-
-                };
-
-            };
-
-            last_check = now;
-        }; // End connection handling.
-
-        // Broadcast player states here.
         
-        if (clients.size() > 0) {
-
-            Network::Message s_Msg;
-            Network::MsgContentPlayerStates msg_content;
-            msg_content.message_type = Network::ServerMessageType::PlayerStates;
-            msg_content.timestamp_ms = timeSinceEpochMillisec();
-            std::vector<Player::PlayerState*> player_states;
-
-            for( auto const& cli : clients) {
-
-                player_states.push_back( &cli.second->player_state );
-
-            }
-            msg_content.Write( s_Msg.buffer, player_states );
-            
-            s_Msg.bufferLength = msg_content.sizeof_content();
-
-            for( auto const& cli : clients) {
-                s_Msg.SetAddress( cli.second->address );
-                Send( &sock, s_Msg );
-            }
-
-        }
-        
-
-    }; // End main loop.
+    } // End while running
     
     printf("Exiting program normally...");
     WSACleanup();

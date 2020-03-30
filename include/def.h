@@ -7,6 +7,7 @@
 #define _DEBUG_EVERY_MESSAGE
 
 #define NO_ID_GIVEN -1
+#define assert(x)
 
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
@@ -41,3 +42,4 @@ constexpr float32 gravitation_y_per_millisecond = 0.003;
 
 constexpr float32 window_coord_width = 1000;
 constexpr float32 window_coord_height = 1000;
+

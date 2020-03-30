@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pre.h"
+#include "def.h"
 
 namespace Network
 {
@@ -37,15 +38,12 @@ public:
     };
 };
 
-void send_msg(SOCKET* sock, Message& s_Msg){
-    uint8 message_type;
-    memcpy( &message_type, &s_Msg.buffer[0], sizeof( message_type ) );
-    
+void send_msg(SOCKET* sock, Message& s_Msg, uint32 buffer_length, SOCKADDR_IN address) {
     if (sendto( *sock,
                 (const char*) s_Msg.buffer,
-                s_Msg.bufferLength,
+                buffer_length,
                 s_Msg.flags,
-                (SOCKADDR*)&s_Msg.address,
+                (SOCKADDR*)&address,
                 s_Msg.address_size) == SOCKET_ERROR) {
         printf( "sendto failed: %d", WSAGetLastError() );
     }
@@ -116,6 +114,6 @@ bool8 make_socket(SOCKET* out_socket)
     *out_socket = sock;
 
 	return true;
-}
+};
 
 }

@@ -7,157 +7,147 @@
 namespace Network
 {
 
-class MsgContentBase {
-protected:
-public:
+
+uint32 client_msg_register_write( uint8* buffer) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ClientMessageType::RegisterRequest);
+    
+    return (uint32)(iterator - buffer);
+};
+
+uint32 client_msg_ack_write( uint8* buffer, uint32 id) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ClientMessageType::RegisterAck);
+    write_uint32(&iterator, id);
+
+    return (uint32)(iterator - buffer);
+};
+
+void client_msg_ack_read( uint8* buffer, uint32* id ) {
+    uint8* iterator = buffer;
 
     uint8 message_type;
-    uint64 timestamp_ms;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ClientMessageType::RegisterAck);
 
-    void Write(uint8* buffer) {
-        uint8* iterator = buffer;
-        write_uint8(&iterator, message_type);
-        write_uint64(&iterator, timestamp_ms);
-    };
+    read_uint32(&iterator, id);
+} 
 
-    void Read(uint8* buffer) {
-        uint8* iterator = buffer;
-        read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &timestamp_ms);
-    };
-    
-    const size_t sizeof_content() {
-        return sizeof( message_type ) + sizeof( timestamp_ms );
-    };
+uint32 client_msg_leave_write( uint8* buffer, uint32 id ) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ClientMessageType::Leave);
+    write_uint32(&iterator, id);
+
+    return (uint32)(iterator - buffer);
 };
 
-class MsgContentID : public MsgContentBase {
-public:
+void client_msg_leave_read( uint8* buffer, uint32* id ) {
+    uint8* iterator = buffer;
 
-    uint32 id;
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ClientMessageType::Leave);
 
-    void Write(uint8* buffer) {
-        uint8* iterator = buffer;
-        write_uint8(&iterator, message_type);
-        write_uint64(&iterator, timestamp_ms);
-        write_uint32(&iterator, id);
-    };
-
-    void Read(uint8* buffer) {
-        uint8* iterator = buffer;
-        read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &timestamp_ms);
-        read_uint32(&iterator, &id);
-    };
-    
-    const size_t sizeof_content() {
-        return sizeof( message_type ) +
-               sizeof( timestamp_ms ) +
-               sizeof( id );
-    };
-};
-
-class MsgContentInput : public MsgContentID {
-public:
-    Player::PlayerInput input;
-
-    void Write(uint8* buffer) {
-        uint8* iterator = buffer;
-        write_uint8(&iterator, message_type);
-        write_uint64(&iterator, timestamp_ms);
-        write_uint32(&iterator, id);
-        write_player_input_verbose(&iterator, &input);
-    };
-
-    void Read(uint8* buffer) {
-        uint8* iterator = buffer;
-        read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &timestamp_ms);
-        read_uint32(&iterator, &id);
-        read_player_input_verbose(&iterator, &input);
-    };
-    
-    const size_t sizeof_content() {
-        // sizeof( bool8 ) representing the compressed player input.
-        return sizeof( message_type ) +
-               sizeof( timestamp_ms ) +
-               sizeof( id ) + 
-               Player::PlayerInput::sizeof_content();
-    };
-};
-
-#define NOT_SET_YET -1
-
-class MsgContentPlayerStates : public MsgContentBase {
-public:
-
-    uint8 player_amount = NOT_SET_YET;
-    
-    void Write( uint8* buffer, std::vector<Player::PlayerState*> param_states ) {
-        uint8* iterator = buffer;
-        write_uint8(&iterator, message_type);
-        write_uint64(&iterator, timestamp_ms);
-        player_amount = param_states.size();
-        write_uint8(&iterator, player_amount);
-
-        for(int i = 0; i < param_states.size(); i++) {
-            write_int64(&iterator, param_states[i]->id);
-            write_float64(&iterator, param_states[i]->x);
-            write_float64(&iterator, param_states[i]->y);
-            write_float32(&iterator, param_states[i]->speed_x);
-            write_float32(&iterator, param_states[i]->speed_y);
-        }
-
-    }
-
-    void Read( uint8* buffer, std::vector<Player::PlayerState*>& param_states) {
-        uint8* iterator = buffer;
-        read_uint8(&iterator, &message_type);
-        read_uint64(&iterator, &timestamp_ms);
-        read_uint8(&iterator, &player_amount);
-        
-        for(int i = 0; i < player_amount; i++) {
-            Player::PlayerState* player = new Player::PlayerState();
-
-            read_int64(&iterator, &player->id);
-            read_float64(&iterator, &player->x);
-            read_float64(&iterator, &player->y);
-            read_float32(&iterator, &player->speed_x);
-            read_float32(&iterator, &player->speed_y);
-            param_states.push_back( player );
-
-        }
-    }
-
-    const size_t sizeof_content() {
-
-        if ( player_amount != NOT_SET_YET ){
-                
-            size_t size = 0;
-
-            size += sizeof( message_type );
-            size += sizeof( timestamp_ms);
-            size += sizeof( uint8 ); // amount_of_players;
-            
-            for(int i = 0; i < player_amount; i++) {
-                // Size of id + x + y + speed_x + speed_y
-                size += Player::PlayerState::sizeof_content();
-            }
-
-            return size;
-        }
-        else {
-            exit(EXIT_FAILURE);
-        }
-
-    };
+    read_uint32(&iterator, id);
 
 };
 
-// TODO: fix this and sizeof stuff because sizeof can really mess things up
-// if the content size varies.
-class MsgContentGameState : public MsgContentBase {};
-class MsgContentKicked : public MsgContentBase {};
-class MsgContentConnection : public MsgContentID {};
+uint32 client_msg_connection_write( uint8* buffer ) {
+    uint8* iterator = buffer;
 
-} // end namespace Network
+    write_uint8(&iterator, (uint8) ClientMessageType::ConnectionResponse);
+
+    return (uint32)(iterator - buffer);
+};
+
+
+
+
+uint32 server_msg_syn_write( uint8* buffer, uint32 id ) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ServerMessageType::RegisterSyn);
+    write_uint32(&iterator, id);
+
+    return (uint32)(iterator - buffer);
+};
+
+void server_msg_syn_read( uint8* buffer, uint32* id ) {
+    uint8* iterator = buffer;
+
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ServerMessageType::RegisterSyn);
+
+    read_uint32(&iterator, id);
+
+};
+
+uint32 server_msg_register_result_write( uint8* buffer, uint8 yes_no ) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ServerMessageType::RegisterResult);
+    write_uint8(&iterator, yes_no);
+
+    return (uint32)(iterator - buffer);
+}
+
+void server_msg_register_result_read( uint8* buffer, uint8* yes_no ) {
+    uint8* iterator = buffer;
+
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ServerMessageType::RegisterResult);
+
+    read_uint8(&iterator, yes_no);
+};
+
+uint32 server_msg_kicked_write( uint8* buffer ) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ServerMessageType::Kicked);
+
+    return (uint32)(iterator - buffer);
+};
+
+uint32 server_msg_connection_write( uint8* buffer ) {
+    uint8* iterator = buffer;
+
+    write_uint8(&iterator, (uint8) ServerMessageType::ConnectionRequest);
+
+    return (uint8)(iterator - buffer);
+};
+
+
+
+
+
+
+
+uint32 client_msg_input_write( uint8* buffer, uint32 id, uint64 timestamp_ms, Player::PlayerInput input ) {
+    uint8* iterator = buffer;
+    write_uint8(&iterator, (uint8) ClientMessageType::Input);
+    write_uint32(&iterator, id);
+    write_uint64(&iterator, timestamp_ms);
+    write_player_input(&iterator, &input);
+
+    return (uint32)(iterator - buffer);
+};
+
+void client_msg_input_read( uint8* buffer, uint32* id, uint64* timestamp_ms, Player::PlayerInput* input ) {
+    uint8* iterator = buffer;
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ClientMessageType::Input);
+    
+    read_uint32(&iterator, id);
+    read_uint64(&iterator, timestamp_ms);
+    read_player_input(&iterator, input);
+
+};
+
+
+}
