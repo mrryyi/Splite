@@ -6,7 +6,7 @@
 
 class Client {
 public:
-    int32 unique_id;
+    uint32 unique_id;
     SOCKADDR_IN address;
     
     int64 last_seen;
@@ -35,4 +35,4 @@ public:
     }
 };
 
-typedef std::map<int32, Client*> ClientMap;
+typedef std::map<uint32, Client*> ClientMap;

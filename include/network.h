@@ -38,16 +38,28 @@ public:
     };
 };
 
-void send_msg(SOCKET* sock, Message& s_Msg, uint32 buffer_length, SOCKADDR_IN address) {
+void send_msg(SOCKET* sock, Message& s_Msg, uint32 buffer_length, SOCKADDR_IN& address) {
     if (sendto( *sock,
                 (const char*) s_Msg.buffer,
                 buffer_length,
                 s_Msg.flags,
                 (SOCKADDR*)&address,
+                sizeof( address )) == SOCKET_ERROR) {
+        printf( "sendto failed: %d", WSAGetLastError() );
+    }
+}
+
+void send_msg(SOCKET* sock, Message& s_Msg) {
+    if (sendto( *sock,
+                (const char*) s_Msg.buffer,
+                s_Msg.bufferLength,
+                s_Msg.flags,
+                (SOCKADDR*)&s_Msg.address,
                 s_Msg.address_size) == SOCKET_ERROR) {
         printf( "sendto failed: %d", WSAGetLastError() );
     }
 }
+
 
 static bool8 set_sock_opt(SOCKET sock, int opt, int val)
 {

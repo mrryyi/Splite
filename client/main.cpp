@@ -5,7 +5,6 @@
 #include "..\include\timer.h"
 
 #include "..\include\graphics.h"
-#include "comm.h"
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -88,7 +87,7 @@ int main() {
     int64 last_ask = timeSinceEpochMillisec();
     int64 now;
 
-    constexpr float32 milliseconds_per_tick = 1000 / ((float32) CLIENT_TICK_RATE);
+    constexpr float32 local_milliseconds_per_tick = 1000 / ((float32) CLIENT_TICK_RATE);
 
     constexpr int32 framerate = 144;
     constexpr float32 milliseconds_per_frame = 1000 / (float32) framerate;
@@ -104,6 +103,8 @@ int main() {
     bool running = true;
 
     std::vector<Player::PlayerState*> player_states;
+    uint32 my_player_state_i;
+
 
     bool8 connected = false;
     uint32 id_from_server = NO_ID_GIVEN;
@@ -113,9 +114,10 @@ int main() {
 
     uint32 msg_size;
 
+
     while( running ) {
 
-        while ( Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick) {
+        while ( Timer_ms::timer_get_ms_since_start() < local_milliseconds_per_tick) {
             int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
             if( bytes_received != SOCKET_ERROR )
             {
@@ -133,7 +135,7 @@ int main() {
                         printf("Handshaking...\n");
                         Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
                         Network::Message s_Msg;
-                        msg_size = Network::client_msg_ack_write( r_Msg.buffer, id_from_server );
+                        msg_size = Network::client_msg_ack_write( s_Msg.buffer, id_from_server );
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
@@ -149,6 +151,7 @@ int main() {
                             connected = true;
                         }
                         else {
+                            printf("Rejected :/\n");
                             id_from_server = NO_ID_GIVEN;
                             connected = false;
                         }
@@ -157,12 +160,30 @@ int main() {
                     break;
                     case Network::ServerMessageType::ConnectionRequest:
                     {
-                        printf("Connection packet...");
+                        printf("Connection upkeep.\n");
                         Network::Message s_Msg;
                         msg_size = Network::client_msg_connection_write( s_Msg.buffer );
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
+                    case Network::ServerMessageType::PlayerStates:
+                    {
+
+                        player_states.clear();
+                        uint64 tick;
+                        Network::server_msg_player_states_read( r_Msg.buffer, &player_states, &tick );
+
+                        printf("Server tick: %d\n", tick);
+                        for(int i = 0; i < player_states.size(); i++) {
+                            if (player_states[i]->id == id_from_server) {
+                                // Copy
+                                my_player_state_i = i;
+                                break;
+                            }
+                        }
+                    
+                    }
+                    break;
                     default:
                     {
 
@@ -177,15 +198,18 @@ int main() {
         Timer_ms::timer_start();
 
         time_since_heard_from_server_ms = last_heard_from_server_ms - now;
-
+        
+        /*
         if ( time_since_heard_from_server_ms > 5000 ) {
             connected = false;
             id_from_server = NO_ID_GIVEN;
-        }
+        }*/
 
         if ( connected != true ) {
             now = timeSinceEpochMillisec();
-            if (now - last_ask > interval_ms) {
+
+            int32 time_since = now - last_ask;
+            if ( time_since > interval_ms ) {
                 Network::Message s_Msg;
                 msg_size = Network::client_msg_register_write( s_Msg.buffer );
                 Network::send_msg( &sock, s_Msg, msg_size, server_address );
@@ -203,13 +227,26 @@ int main() {
             input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
             input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
 
+
             // If input is new, send new input.
             if ( old_input != input ) {
                 Network::Message s_Msg;
                 msg_size = Network::client_msg_input_write( s_Msg.buffer, id_from_server, timeSinceEpochMillisec(), input );
                 Network::send_msg( &sock, s_Msg, msg_size, server_address );
             }
+
+            for(int i = 0; i < player_states.size(); i++) {
+
+                if ( i == my_player_state_i ) {
+                    Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
+                }
+                else {
+                    Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
+                }
+
+            }
         }
+
 
         // Update physics
         // TODO: ADD PHYSICS

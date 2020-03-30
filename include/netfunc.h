@@ -80,6 +80,15 @@ static void write_player_input_verbose(uint8** buffer, Player::PlayerInput* inpu
     write_uint8(buffer, input->jump);
 };
 
+static void write_player_state(uint8** buffer, const Player::PlayerState* ps) {
+    write_uint32(buffer, ps->id);
+    write_float64(buffer, ps->x);
+    write_float64(buffer, ps->y);
+    write_float32(buffer, ps->speed_x);
+    write_float32(buffer, ps->speed_y);
+};
+
+
 static void read_uint8(uint8** buffer, uint8* ui8) {
     // Set value of dereferenced pointer to value at buffer iterator.
     *ui8 = **buffer;
@@ -140,6 +149,14 @@ static void read_player_input_verbose(uint8** buffer, Player::PlayerInput* input
     read_uint8(buffer, &input->left);
     read_uint8(buffer, &input->right);
     read_uint8(buffer, &input->jump);
+};
+
+static void read_player_state(uint8** buffer, Player::PlayerState* ps) {
+    read_uint32(buffer, &ps->id);
+    read_float64(buffer, &ps->x);
+    read_float64(buffer, &ps->y);
+    read_float32(buffer, &ps->speed_x);
+    read_float32(buffer, &ps->speed_y);
 };
 
 }

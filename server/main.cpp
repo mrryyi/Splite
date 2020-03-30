@@ -3,7 +3,6 @@
 #include "..\include\network.h"
 #include "..\include\timer.h"
 #include "..\include\network_messages.h"
-#include "..\include\msg_construct_server.h"
 #include "..\include\client.h"
 
 #include <map>
@@ -73,21 +72,16 @@ int main() {
 
     int64 now;
     int64 last_check;
-    int64 ticks = 0;
+    int64 tick = 0;
     uint32 lastID = 0;
 
     bool8 running = true;
     Timer_ms::timer_start();
 
-    char buffer[SOCKET_BUFFER_SIZE];
-    int flags = 0;
-    SOCKADDR_IN from;
-    int from_size = sizeof( from );
-
     uint32 msg_size;
 
     while ( running ) {
-        while( Timer_ms::timer_get_ms_since_start() < milliseconds_per_tick) {
+        while( Timer_ms::timer_get_ms_since_start() < server_milliseconds_per_tick) {
 
             uint32 bytes_received;
 
@@ -100,6 +94,7 @@ int main() {
                     case Network::ClientMessageType::RegisterRequest:
                     {
 
+                        printf("Register request.\n");
                         uint32 id_for_client = ++lastID;
                         Network::Message s_Msg;
                         msg_size = Network::server_msg_syn_write( s_Msg.buffer, id_for_client );
@@ -110,10 +105,15 @@ int main() {
                     case Network::ClientMessageType::RegisterAck:
                     {
 
-                        uint8 yes_no = false;
+                        uint8 yes_no = 0;
+                        uint32 id;
+                        Network::client_msg_ack_read( r_Msg.buffer, &id );
+                        printf("registerack");
 
-                        if ( clients.size() < MAX_CLIENTS_CONNECTED ) {
-                            yes_no = true;
+                        if ( clients.size() < MAX_CLIENTS_CONNECTED && clients.count( id ) == 0 ) {
+                            yes_no = 1;
+                            clients[id] = new Client( id, r_Msg.address );
+                            printf("New client registered.\n");
                         }
 
                         Network::Message s_Msg;
@@ -122,6 +122,17 @@ int main() {
 
                     }
                     break;
+                    case Network::ClientMessageType::Input:
+                    {
+                        uint32 id;
+                        uint64 timestamp_ms;
+                        Player::PlayerInput player_input;
+                        Network::client_msg_input_read( r_Msg.buffer, &id, &timestamp_ms, &player_input );
+                        
+                        if( clients.count( id ) > 0 ) {
+                            clients[id]->input = player_input;
+                        }
+                    }
                     default:
                     break;
                 } // End switch
@@ -129,7 +140,35 @@ int main() {
         } // End while tick not complete
 
         Timer_ms::timer_start();
+
+        if( clients.size() > 0 )
+        {
+
+            std::vector<Player::PlayerState> player_states;
+
+            for( auto const& cli : clients ) {
+                
+                // Tick player movement.
+                Player::tick_player_by_input( cli.second->player_state, cli.second->input, server_milliseconds_per_tick );
+
+                //
+                player_states.push_back(cli.second->player_state);
+
+            };
+
+            Network::Message s_Msg;
+            msg_size = Network::server_msg_player_states_write( s_Msg.buffer, player_states, tick);
+
+            for( auto const& cli : clients ) {
+                printf("Sending playerstate to client %d\n", cli.second->unique_id);
+                Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
+            }
+
+        }
+
+
         
+        tick++;
     } // End while running
     
     printf("Exiting program normally...");
