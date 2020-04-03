@@ -114,8 +114,12 @@ int main() {
 
     uint32 msg_size;
 
+    bool8 hmt_pressed_last_tick = false;
+    bool8 released_yet = false;
 
     while( running ) {
+        
+        bool8 state_got_this_tick = false;
 
         while ( Timer_ms::timer_get_ms_since_start() < local_milliseconds_per_tick) {
             int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
@@ -168,6 +172,8 @@ int main() {
                     }
                     case Network::ServerMessageType::PlayerStates:
                     {
+
+                        state_got_this_tick = true;
 
                         player_states.clear();
                         uint64 tick;
@@ -247,17 +253,22 @@ int main() {
             }
         }
 
-
-        // Update physics
-        // TODO: ADD PHYSICS
-
         // Update graphics
         // Should take in a gamestate object.
         now = timeSinceEpochMillisec();
+        bool8 hmt_pressed_now = (bool8) glfwGetKey( graphics_handle.window, GLFW_KEY_H );
+        // Toggle history mode by button release.
+        if (  (!hmt_pressed_last_tick && hmt_pressed_now) ) {
+            graphics_handle.history_mode_toggle();
+        }
+
+        hmt_pressed_last_tick = hmt_pressed_now;
+
         if ( now - last_frame_ms >= milliseconds_per_frame ) {
-            graphics_handle.Update( player_states );
+            graphics_handle.Update( player_states, state_got_this_tick );
             last_frame_ms = now;
         }
+
     }
 
     printf("Exiting program normally...\n");

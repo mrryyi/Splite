@@ -62,9 +62,22 @@ public:
 };
 
 // Per millisecond
-constexpr float32 player_movement_speed_pms = 0.1;
-constexpr float32 player_jump_speed_pms = 5.0;
-constexpr float32 gravity_pms = 1.0;
+constexpr float32 player_movement_speed_pms = 0.5;
+constexpr float32 player_jump_speed_pms = 2.0;
+constexpr float32 gravity_pms = 0.01;
+
+
+void tick_player_by_physics( PlayerState &player_state, float32 delta_time_ms ) {
+
+    player_state.speed_y -= gravity_pms * delta_time_ms;
+    
+    player_state.x += player_state.speed_x * delta_time_ms;
+    player_state.y += player_state.speed_y * delta_time_ms;
+
+    if (player_state.y < 0.0) {
+        player_state.y = 0.0;
+    }
+};
 
 void tick_player_by_input( PlayerState &player_state, PlayerInput &player_input, float32 delta_time_ms ) {
 
@@ -89,27 +102,10 @@ void tick_player_by_input( PlayerState &player_state, PlayerInput &player_input,
         }
     }
 
-    player_state.speed_y -= gravity_pms;
-    
-    player_state.x += player_state.speed_x * delta_time_ms;
-    player_state.y += player_state.speed_y * delta_time_ms;
+    tick_player_by_physics( player_state, delta_time_ms );
 
-    if (player_state.y < 0.0) {
-        player_state.y = 0.0;
-    }
 };
 
-void tick_player_by_physics( PlayerState &player_state, float32 delta_time_ms ) {
-
-    player_state.speed_y -= gravity_pms;
-    
-    player_state.x += player_state.speed_x * delta_time_ms;
-    player_state.y += player_state.speed_y * delta_time_ms;
-
-    if (player_state.y < 0.0) {
-        player_state.y = 0.0;
-    }
-};
 
 void print_player_state(const PlayerState& ps) {
     printf("[id: %d, x:%f, y:%f]\n", ps.id, ps.x, ps.y);
