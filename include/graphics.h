@@ -76,8 +76,22 @@ struct vec3d {
     float32 x, y, z;
 };
 
+struct color3f {
+    GLfloat r = { 1.0 }, g = { 1.0 }, b = { 1.0 };
+
+    void operator=(const color3f& param) {
+        r = param.r;
+        g = param.g;
+        b = param.b;
+    }
+};
+
 struct triangle {
     vec3d p[3];
+
+    color3f color;
+
+
 };
 
 struct mesh {
@@ -141,6 +155,7 @@ private:
 
     void draw_line( float32 x1, float32 y1 , float x2, float32 y2){
         glBegin(GL_LINES);
+        glColor3f(0.0, 0.0, 0.0);
         glVertex2f(x1, y1);
         glVertex2f(x2, y2);
         glEnd();
@@ -152,6 +167,20 @@ private:
         draw_line( tri.p[2].x, tri.p[2].y, tri.p[0].x, tri.p[0].y );
     }
 
+    void draw_triangle_filled ( const triangle& tri ) {
+        glBegin(GL_POLYGON);
+        glColor3f(tri.color.r, tri.color.g, tri.color.b);
+        glVertex3f(tri.p[0].x, tri.p[0].y, 0.0);
+        glVertex3f(tri.p[1].x, tri.p[1].y, 0.0);
+        glVertex3f(tri.p[2].x, tri.p[2].y, 0.0);
+        glEnd();
+    }
+
+    void get_color_by_lum(float32 lum, color3f& out_color ) {
+        out_color.r = lum;
+        out_color.g = lum;
+        out_color.b = lum;
+    }
 
 public:
 
@@ -294,10 +323,21 @@ public:
                     normal.z * (triTranslated.p[0].z - vCamera.z) < 0.0)
                 {
 
+                    vec3d light_direction =  {0.0f, 0.0f, -1.0f};
+                    float32 l = sqrtf(light_direction.x*light_direction.x + light_direction.y*light_direction.y + light_direction.z*light_direction.z);
+                    light_direction.x /= l; light_direction.y /= l; light_direction.z /= l;
+
+                    float32 dp = normal.x * light_direction.x + normal.y * light_direction.y + normal.z * light_direction.z;
+
+                    get_color_by_lum(dp, triTranslated.color);
+
                     // Project triangles from 3D --> 2D
                     multiply_matrix_vector(triTranslated.p[0], triProjected.p[0], matProj);
                     multiply_matrix_vector(triTranslated.p[1], triProjected.p[1], matProj);
                     multiply_matrix_vector(triTranslated.p[2], triProjected.p[2], matProj);
+
+                    triProjected.color = triTranslated.color;
+
 
                     triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
                     triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
@@ -310,7 +350,7 @@ public:
                     triProjected.p[2].x *= 0.5f * (float32) width;
                     triProjected.p[2].y *= 0.5f * (float32) height;
 
-                    draw_triangle(triProjected);
+                    draw_triangle_filled(triProjected);
 
                 }
             }
