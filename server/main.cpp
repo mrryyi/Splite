@@ -1,5 +1,4 @@
 #include "..\include\pre.h"
-#include "..\include\types.h"
 #include "..\include\network.h"
 #include "..\include\timer.h"
 #include "..\include\network_messages.h"
