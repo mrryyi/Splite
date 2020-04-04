@@ -53,15 +53,25 @@ void client_msg_leave_read( uint8* buffer, uint32* id ) {
     assert(message_type == (uint8) ClientMessageType::Leave);
 
     read_uint32(&iterator, id);
-
 };
 
-uint32 client_msg_connection_write( uint8* buffer ) {
+uint32 client_msg_connection_write( uint8* buffer, uint32 id ) {
     uint8* iterator = buffer;
 
     write_uint8(&iterator, (uint8) ClientMessageType::ConnectionResponse);
 
+    write_uint32(&iterator, id);
     return (uint32)(iterator - buffer);
+};
+
+void client_msg_connection_read( uint8* buffer, uint32* id) {
+    uint8* iterator = buffer;
+    
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ClientMessageType::ConnectionResponse);
+
+    read_uint32(&iterator, id);
 };
 
 

@@ -166,7 +166,7 @@ int main() {
                     {
                         printf("Connection upkeep.\n");
                         Network::Message s_Msg;
-                        msg_size = Network::client_msg_connection_write( s_Msg.buffer );
+                        msg_size = Network::client_msg_connection_write( s_Msg.buffer, id_from_server );
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
@@ -203,13 +203,14 @@ int main() {
 
         Timer_ms::timer_start();
 
-        time_since_heard_from_server_ms = last_heard_from_server_ms - now;
+        now = timeSinceEpochMillisec();
+        time_since_heard_from_server_ms = now - last_heard_from_server_ms;
         
-        /*
-        if ( time_since_heard_from_server_ms > 5000 ) {
+        if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
+            printf("Not connected anymore.");
             connected = false;
             id_from_server = NO_ID_GIVEN;
-        }*/
+        }
 
         if ( connected != true ) {
             now = timeSinceEpochMillisec();
@@ -223,7 +224,7 @@ int main() {
             }
         }
         
-        if ( connected ) {
+        if ( connected && id_from_server != NO_ID_GIVEN ) {
 
             Player::PlayerInput old_input = input;
 

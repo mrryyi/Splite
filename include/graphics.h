@@ -77,29 +77,6 @@ public:
     GraphicsHandle() {
 
     }
-
-    struct vector2f {
-        float64 x, y;
-    };
-
-    struct client_history_pos : vector2f {
-        bool8 state_got;
-    };
-
-    using history_pos = std::vector<client_history_pos>;
-
-    std::map<uint32, history_pos> player_positions;
-
-    bool8 history_mode_on = true;
-
-    void history_mode_toggle() {
-        history_mode_on = !history_mode_on;
-
-        if ( !history_mode_on ) {
-            // Luckily std::map destructs any comp
-            player_positions.clear();
-        }
-    }
     
     // Updates graphics.
     FRESULT Update(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
@@ -121,50 +98,12 @@ public:
             // "looking".
             glViewport(viewport_x, viewport_y, width, height);
             glClear(GL_COLOR_BUFFER_BIT);
-
-            float32 player_width = 10.0;
-            float32 player_height = 10.0;
-
-            size_t max_history_len = 20;
             
-            for(int i = 0; i < player_states.size(); i++) {
-                
-                if ( history_mode_on ) {
-
-                    uint32 player_id = player_states[i]->id;
-
-                    // Add player to history map.
-                    if ( player_positions.count( player_id ) < 1 ) {
-                        history_pos hpos;
-                        player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
-                    }
-
-                    if ( player_positions.count( player_id )) {
-
-                        // Add new position to history
-                        player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
-
-                        // Delete oldest history pos.
-                        if ( player_positions[player_id].size() > max_history_len ) {
-                            player_positions[player_id].erase( player_positions[player_id].begin() );
-                        }
-                    }
-
-                    // Draw history.
-                    for( auto const& pos : player_positions[ player_id ]) {
-                        Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
-                        rect.render( pos.state_got );
-                    }
-                    
-                }
-                else {
-                    
-                    // Draw latest only if not history mode.
-                    Rect_w rect = Rect_w(player_states[i]->x, player_states[i]->y, player_width, player_height);
-                    rect.render( state_got );
-
-                }
-
+            if ( history_mode_on ) {
+                render_players_with_history( player_states, state_got );
+            }
+            else {
+                render_players( player_states, state_got );
             }
             
             glfwSwapBuffers(window);
@@ -173,6 +112,81 @@ public:
 
         return FRESULT(FR_OK);
     }
+    
+    void history_mode_toggle() {
+        history_mode_on = !history_mode_on;
+
+        if ( !history_mode_on ) {
+            // Luckily std::map destructs any comp
+            player_positions.clear();
+        }
+    }
+
+private:
+
+    struct vector2f {
+        float64 x, y;
+    };
+
+    struct client_history_pos : vector2f {
+        bool8 state_got;
+    };
+
+    using history_pos = std::vector<client_history_pos>;
+
+    std::map<uint32, history_pos> player_positions;
+
+    bool8 history_mode_on = true;
+    size_t max_history_len = 20;
+
+
+    
+    void render_player(Player::PlayerState* ps, bool8 state_got) {
+
+        Rect_w rect = Rect_w(ps->x, ps->y, player_width, player_height);
+        rect.render( state_got );
+
+    }
+
+    void render_players(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+
+        for( size_t i = 0; i < player_states.size(); i++) {
+            render_player(player_states[i], state_got);
+        }
+
+    }
+
+    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+
+        for(int i = 0; i < player_states.size(); i++) {
+
+            uint32 player_id = player_states[i]->id;
+
+            // Add player to history map.
+            if ( player_positions.count( player_id ) < 1 ) {
+                history_pos hpos;
+                player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
+            }
+
+            if ( player_positions.count( player_id )) {
+
+                // Add new position to history
+                player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
+
+                // Delete oldest history pos.
+                if ( player_positions[player_id].size() > max_history_len ) {
+                    player_positions[player_id].erase( player_positions[player_id].begin() );
+                }
+            }
+
+            // Draw history.
+            for( auto const& pos : player_positions[ player_id ]) {
+                Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
+                rect.render( pos.state_got );
+            }
+        }
+    }
+
 };
 
 FRESULT create_window(GraphicsHandle& handle) {

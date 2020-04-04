@@ -70,9 +70,9 @@ int main() {
     
     printf("[Server started.]\n[Listening...]\n");
 
-    int64 now;
-    int64 last_check;
-    int64 tick = 0;
+    uint64 now;
+    uint64 last_check;
+    uint64 tick = 0;
     uint32 lastID = 0;
 
     bool8 running = true;
@@ -122,6 +122,16 @@ int main() {
 
                     }
                     break;
+                    case Network::ClientMessageType::ConnectionResponse:
+                    {
+                        uint32 id;
+                        Network::client_msg_connection_read( r_Msg.buffer, &id );
+                        if ( clients.count( id ) > 0 ) {
+                            uint64 time_now = timeSinceEpochMillisec();
+                            clients[id]->last_seen = now;
+                            clients[id]->last_asked = now;
+                        }
+                    }
                     case Network::ClientMessageType::Input:
                     {
                         uint32 id;
@@ -130,7 +140,10 @@ int main() {
                         Network::client_msg_input_read( r_Msg.buffer, &id, &timestamp_ms, &player_input );
                         
                         if( clients.count( id ) > 0 ) {
+                            uint64 time_now = timeSinceEpochMillisec();
                             clients[id]->input = player_input;
+                            clients[id]->last_seen = timeSinceEpochMillisec();
+                            clients[id]->last_asked = timeSinceEpochMillisec();
                         }
                     }
                     default:
@@ -140,6 +153,33 @@ int main() {
         } // End while tick not complete
 
         Timer_ms::timer_start();
+
+        now = timeSinceEpochMillisec();
+
+        if ( now - last_check >= INTERVAL_CHECK_CLIENTS_MS ) {
+            for( auto const& cli : clients ) {
+                
+                if ( now - cli.second->last_seen >= MAX_TIME_UNHEARD_FROM_MS) {
+
+                    Network::Message s_Msg;
+                    msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
+                    Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
+                    clients.erase( cli.first );
+
+                }
+                else if ((now - cli.second->last_seen  >= INTERVAL_CHECK_CLIENT_MS) &&
+                    (now - cli.second->last_asked >= INTERVAL_CHECK_CLIENT_MS))
+                {
+
+                    cli.second->last_asked = now;
+
+                    Network::Message s_Msg;
+                    msg_size = Network::server_msg_connection_write( s_Msg.buffer );
+                    Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
+
+                }
+            }
+        }
 
         if( clients.size() > 0 )
         {
