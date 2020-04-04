@@ -157,6 +157,9 @@ int main() {
         now = timeSinceEpochMillisec();
 
         if ( now - last_check >= INTERVAL_CHECK_CLIENTS_MS ) {
+
+            std::vector<uint32> client_ids_to_kick;
+
             for( auto const& cli : clients ) {
                 
                 if ( now - cli.second->last_seen >= MAX_TIME_UNHEARD_FROM_MS) {
@@ -164,11 +167,12 @@ int main() {
                     Network::Message s_Msg;
                     msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
                     Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
-                    clients.erase( cli.first );
+
+                    client_ids_to_kick.push_back( cli.first );
 
                 }
                 else if ((now - cli.second->last_seen  >= INTERVAL_CHECK_CLIENT_MS) &&
-                    (now - cli.second->last_asked >= INTERVAL_CHECK_CLIENT_MS))
+                         (now - cli.second->last_asked >= INTERVAL_CHECK_CLIENT_MS))
                 {
 
                     cli.second->last_asked = now;
@@ -179,6 +183,12 @@ int main() {
 
                 }
             }
+
+            for( auto const& client_id : client_ids_to_kick ) {
+                printf("Client kicked: %d\n", client_id);
+                clients.erase( client_id );
+            }
+
         }
 
         if( clients.size() > 0 )

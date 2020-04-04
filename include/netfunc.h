@@ -25,9 +25,6 @@ static void write_uint32(uint8** buffer, uint32 ui32) {
 };
 
 static void write_int32(uint8** buffer, int32 i32) {
-    // Same concept as write_uint8(), except we cannot do do a simple
-    // assignment of the content to the spot. We need to define how to 
-    // copy over the data, which memcpy does for us.
     memcpy(*buffer, &i32, sizeof( i32 ));
     *buffer += sizeof( i32 );
 };

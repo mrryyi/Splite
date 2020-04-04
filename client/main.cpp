@@ -115,7 +115,8 @@ int main() {
     uint32 msg_size;
 
     bool8 hmt_pressed_last_tick = false;
-    bool8 released_yet = false;
+    
+    printf("Running.\nAttempting to connect...\n");
 
     while( running ) {
         
