@@ -105,6 +105,9 @@ private:
     int32 framebuffer_height = 0;
     int32 framebuffer_width = 0;
 
+    // Placeholder for camera.
+    vec3d vCamera;
+
     float32 fTheta;
     
     void multiply_matrix_vector(vec3d &i, vec3d &o, mat4x4 &m) {
@@ -160,30 +163,33 @@ public:
 
     GraphicsHandle() {
         meshCube.tris = {
-            // South
-            { 0.0, 0.0, 0.0,  0.0, 1.0, 0.0,  1.0, 1.0, 0.0},
-            { 0.0, 0.0, 0.0,  1.0, 1.0, 0.0,  1.0, 0.0, 0.0},
 
-            // East
-            { 1.0, 0.0, 0.0,  1.0, 1.0, 0.0,  1.0, 1.0, 1.0},
-            { 1.0, 0.0, 0.0,  1.0, 1.0, 1.0,  1.0, 0.0, 1.0},
+		// SOUTH
+		{ 0.0f, 0.0f, 0.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 0.0f },
+		{ 0.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 0.0f, 0.0f },
 
-            // North
-            { 1.0, 0.0, 1.0,  1.0, 1.0, 1.0,  0.0, 1.0, 1.0 },
-            { 1.0, 0.0, 1.0,  0.0, 1.0, 1.0,  0.0, 0.0, 1.0 },
+		// EAST                                                      
+		{ 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f },
+		{ 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 0.0f, 1.0f },
 
-            // West
-            { 0.0, 0.0, 1.0,  0.0, 1.0, 1.0,  0.0, 1.0, 0.0 },
-            { 0.0, 0.0, 1.0,  0.0, 1.0, 0.0,  0.0, 0.0, 0.0 },
+		// NORTH                                                     
+		{ 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f },
+		{ 1.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f },
 
-            // Top
-            { 0.0, 1.0, 0.0,  0.0, 1.0, 1.0,  1.0, 1.0, 1.0 },
-            { 0.0, 1.0, 0.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0 },
+		// WEST                                                      
+		{ 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f },
 
-            // Down
-            { 1.0, 0.0, 1.0,  0.0, 0.0, 1.0,  0.0, 0.0, 0.0 },
-            { 1.0, 0.0, 1.0,  0.0, 0.0, 0.0,  1.0, 0.0, 0.0 }
-        };
+		// TOP                                                       
+		{ 0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 0.0f },
+
+		// BOTTOM                                                    
+		{ 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f,    1.0f, 0.0f, 0.0f },
+
+		};
+
 
         
     }
@@ -263,24 +269,50 @@ public:
                 triTranslated.p[1].z = triRotatedZX.p[1].z + 3.0f;
                 triTranslated.p[2].z = triRotatedZX.p[2].z + 3.0f;
 
-                // Project triangles from 3D --> 2D
-                multiply_matrix_vector(triTranslated.p[0], triProjected.p[0], matProj);
-                multiply_matrix_vector(triTranslated.p[1], triProjected.p[1], matProj);
-                multiply_matrix_vector(triTranslated.p[2], triProjected.p[2], matProj);
 
-                triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
-                triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
-                triProjected.p[2].x += 1.0f; triProjected.p[2].y += 1.0f;
+                // After translation into world, but after projection onto screen, we
+                // want to fuck off the triangles that should not be seen.
+                vec3d normal, line1, line2;
+                line1.x = triTranslated.p[1].x - triTranslated.p[0].x;
+                line1.y = triTranslated.p[1].y - triTranslated.p[0].y;
+                line1.z = triTranslated.p[1].z - triTranslated.p[0].z;
+                
+                line2.x = triTranslated.p[2].x - triTranslated.p[0].x;
+                line2.y = triTranslated.p[2].y - triTranslated.p[0].y;
+                line2.z = triTranslated.p[2].z - triTranslated.p[0].z;
 
-                triProjected.p[0].x *= 0.5f * (float32) width;
-                triProjected.p[0].y *= 0.5f * (float32) height;
-                triProjected.p[1].x *= 0.5f * (float32) width;
-                triProjected.p[1].y *= 0.5f * (float32) height;
-                triProjected.p[2].x *= 0.5f * (float32) width;
-                triProjected.p[2].y *= 0.5f * (float32) height;
+                normal.x = line1.y * line2.z - line1.z * line2.y;
+                normal.y = line1.z * line2.x - line1.x * line2.z;
+                normal.z = line1.x * line2.y - line1.y * line2.x;
 
-                draw_triangle(triProjected);
+                float32 l = sqrtf(normal.x*normal.x + normal.y*normal.y + normal.z*normal.z);
+                normal.x  /= l; normal.y /= l; normal.z /= l;
 
+                //if (normal.z < 0.0)
+                if (normal.x * (triTranslated.p[0].x - vCamera.x) +
+                    normal.y * (triTranslated.p[0].y - vCamera.y) +
+                    normal.z * (triTranslated.p[0].z - vCamera.z) < 0.0)
+                {
+
+                    // Project triangles from 3D --> 2D
+                    multiply_matrix_vector(triTranslated.p[0], triProjected.p[0], matProj);
+                    multiply_matrix_vector(triTranslated.p[1], triProjected.p[1], matProj);
+                    multiply_matrix_vector(triTranslated.p[2], triProjected.p[2], matProj);
+
+                    triProjected.p[0].x += 1.0f; triProjected.p[0].y += 1.0f;
+                    triProjected.p[1].x += 1.0f; triProjected.p[1].y += 1.0f;
+                    triProjected.p[2].x += 1.0f; triProjected.p[2].y += 1.0f;
+
+                    triProjected.p[0].x *= 0.5f * (float32) width;
+                    triProjected.p[0].y *= 0.5f * (float32) height;
+                    triProjected.p[1].x *= 0.5f * (float32) width;
+                    triProjected.p[1].y *= 0.5f * (float32) height;
+                    triProjected.p[2].x *= 0.5f * (float32) width;
+                    triProjected.p[2].y *= 0.5f * (float32) height;
+
+                    draw_triangle(triProjected);
+
+                }
             }
             
             if ( history_mode_on ) {
