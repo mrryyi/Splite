@@ -266,7 +266,7 @@ int main() {
         hmt_pressed_last_tick = hmt_pressed_now;
 
         if ( now - last_frame_ms >= milliseconds_per_frame ) {
-            graphics_handle.Update( player_states, state_got_this_tick );
+            graphics_handle.Update( player_states, state_got_this_tick, milliseconds_per_frame );
             last_frame_ms = now;
         }
 
