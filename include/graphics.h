@@ -336,7 +336,7 @@ public:
 
     GraphicsHandle() {
         
-        meshCube.load_from_object_file("../obj/karambit_small.obj");
+        meshCube.load_from_object_file("../obj/teapot.obj");
 
     }
 
@@ -459,7 +459,7 @@ public:
             {
                 float32 z1 = (t1.p[0].z + t1.p[1].z + t1.p[2].z) / 3.0f;
                 float32 z2 = (t2.p[0].z + t2.p[1].z + t2.p[2].z) / 3.0f;
-                return z1 < z2;
+                return z1 > z2;
             });
 
             for ( auto &triProjected : vecTrianglesToRaster) {
