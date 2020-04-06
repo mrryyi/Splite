@@ -2,7 +2,8 @@
 #include "..\include\network_messages.h"
 #include "..\include\network.h"
 #include "..\include\timer.h"
-
+#include <glad/glad.h>
+#include "..\include\input.h"
 #include "..\include\graphics.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -24,8 +25,17 @@ int main() {
 
     fr = graphics::create_window(graphics_handle);
     if (fr) {
+        printf("WHAT THE FACK WE FAILED CREATING A WINDOW.\n");
         exit(EXIT_FAILURE);
     }
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+       printf("Failed to initialize GLAD");
+        return -1;
+    }
+
+    glViewport(0, 0, window_coord_width, window_coord_height);
     
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
@@ -118,7 +128,7 @@ int main() {
     
     printf("Running.\nAttempting to connect...\n");
 
-    while( running ) {
+    while( !glfwWindowShouldClose( graphics_handle.window )) {
         
         bool8 state_got_this_tick = false;
 
@@ -229,6 +239,8 @@ int main() {
         }
 
         Player::PlayerInput old_input = input;
+
+        process_input( graphics_handle.window );
         
         // Get input
         input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 

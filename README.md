@@ -5,4 +5,5 @@
 * Windows
 
 ## Dependencies to build
-* GLFW 64-bit windows binaries and headers for compiler of choice.
+* GLFW windows binaries and headers for compiler of choice.
+* GLAD [https://learnopengl.com/Getting-started/Creating-a-window()
