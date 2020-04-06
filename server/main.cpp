@@ -200,7 +200,7 @@ int main() {
                 // Tick player movement.
                 Player::tick_player_by_input( cli.second->player_state, cli.second->input, server_milliseconds_per_tick );
 
-                //
+                // 
                 player_states.push_back(cli.second->player_state);
 
             };
@@ -215,8 +215,6 @@ int main() {
 
         }
 
-
-        
         tick++;
     } // End while running
     

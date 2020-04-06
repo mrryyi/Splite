@@ -151,7 +151,6 @@ uint32 server_msg_player_states_write( uint8* buffer, std::vector<Player::Player
 
     for( auto const& player : player_states ) {
         write_player_state( &iterator, &player );
-        num_players++;
     }
 
     return (uint32)(iterator - buffer);

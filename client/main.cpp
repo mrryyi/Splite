@@ -102,9 +102,10 @@ int main() {
     bool running = true;
 
     std::vector<Player::PlayerState*> player_states;
-    uint32 my_player_state_i;
 
-
+    Player::PlayerState last_known_player_state(NO_ID_GIVEN, 0.0, 0.0, 0.0, 0.0);
+    player_states.push_back(&last_known_player_state);
+    uint32 local_player_state_i;
     bool8 connected = false;
     uint32 id_from_server = NO_ID_GIVEN;
 
@@ -183,7 +184,7 @@ int main() {
                         for(int i = 0; i < player_states.size(); i++) {
                             if (player_states[i]->id == id_from_server) {
                                 // Copy
-                                my_player_state_i = i;
+                                local_player_state_i = i;
                                 break;
                             }
                         }
@@ -210,6 +211,9 @@ int main() {
             printf("Not connected anymore.");
             connected = false;
             id_from_server = NO_ID_GIVEN;
+            player_states.clear();
+            player_states.push_back(&last_known_player_state);
+            local_player_state_i = 0;
         }
 
         if ( connected != true ) {
@@ -223,17 +227,17 @@ int main() {
                 last_ask = now;
             }
         }
+
+        Player::PlayerInput old_input = input;
+        
+        // Get input
+        input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
+        input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
+        input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
+        input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
+        input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
         
         if ( connected && id_from_server != NO_ID_GIVEN ) {
-
-            Player::PlayerInput old_input = input;
-
-            input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
-            input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
-            input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
-            input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
-            input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
-
 
             // If input is new, send new input.
             if ( old_input != input ) {
@@ -242,17 +246,19 @@ int main() {
                 Network::send_msg( &sock, s_Msg, msg_size, server_address );
             }
 
-            for(int i = 0; i < player_states.size(); i++) {
-
-                if ( i == my_player_state_i ) {
-                    Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
-                }
-                else {
-                    Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
-                }
-
-            }
         }
+
+        for(int i = 0; i < player_states.size(); i++) {
+
+            if ( i == local_player_state_i ) {
+                Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
+            }
+            else {
+                Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
+            }
+
+        }
+
 
         // Update graphics
         // Should take in a gamestate object.
@@ -262,10 +268,10 @@ int main() {
         if (  (!hmt_pressed_last_tick && hmt_pressed_now) ) {
             graphics_handle.history_mode_toggle();
         }
-
         hmt_pressed_last_tick = hmt_pressed_now;
 
-        if ( now - last_frame_ms >= milliseconds_per_frame ) {
+        uint64 delta_frame_time = now - last_frame_ms;
+        if ( delta_frame_time >= milliseconds_per_frame ) {
             graphics_handle.Update( player_states, state_got_this_tick, milliseconds_per_frame );
             last_frame_ms = now;
         }

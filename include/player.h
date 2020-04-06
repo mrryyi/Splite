@@ -40,7 +40,7 @@ struct PlayerInput
 
 class PlayerState {
 public:
-    uint32 id;
+    uint32 id = NO_ID_GIVEN;
     float64 x = 0.0;
     float64 y = 0.0;
     float32 speed_x = 0.0;

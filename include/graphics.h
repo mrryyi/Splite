@@ -164,8 +164,9 @@ private:
 
     // Placeholder for camera.
     vec3d vCamera;
+    vec3d vLookDir;
 
-    float32 fTheta;
+    float32 fTheta = 0.0;
 
     vec3d matrix_multiply_vector( mat4x4 &m, vec3d &i) {
         vec3d v;
@@ -238,6 +239,41 @@ private:
 		for (int c = 0; c < 4; c++)
 			for (int r = 0; r < 4; r++)
 				matrix.m[r][c] = m1.m[r][0] * m2.m[0][c] + m1.m[r][1] * m2.m[1][c] + m1.m[r][2] * m2.m[2][c] + m1.m[r][3] * m2.m[3][c];
+		return matrix;
+	}
+    
+    mat4x4 matrix_point_at(vec3d &pos, vec3d &target, vec3d &up) {
+        // Calculate new forward direction
+        vec3d newForward = vector_sub(target, pos);
+		newForward = vector_normalize(newForward);
+
+		// Calculate new Up direction
+		vec3d a = vector_mul(newForward, vector_dot_product(up, newForward));
+		vec3d newUp = vector_sub(up, a);
+		newUp = vector_normalize(newUp);
+
+		// New Right direction is easy, its just cross product
+		vec3d newRight = vector_cross_product(newUp, newForward);
+
+		// Construct Dimensioning and Translation Matrix	
+		mat4x4 matrix;
+		matrix.m[0][0] = newRight.x;	matrix.m[0][1] = newRight.y;	matrix.m[0][2] = newRight.z;	matrix.m[0][3] = 0.0f;
+		matrix.m[1][0] = newUp.x;		matrix.m[1][1] = newUp.y;		matrix.m[1][2] = newUp.z;		matrix.m[1][3] = 0.0f;
+		matrix.m[2][0] = newForward.x;	matrix.m[2][1] = newForward.y;	matrix.m[2][2] = newForward.z;	matrix.m[2][3] = 0.0f;
+		matrix.m[3][0] = pos.x;			matrix.m[3][1] = pos.y;			matrix.m[3][2] = pos.z;			matrix.m[3][3] = 1.0f;
+		return matrix;
+    }
+
+    mat4x4 matrix_quick_inverse(mat4x4 &m) // Only for Rotation/Translation Matrices
+	{
+		mat4x4 matrix;
+		matrix.m[0][0] = m.m[0][0]; matrix.m[0][1] = m.m[1][0]; matrix.m[0][2] = m.m[2][0]; matrix.m[0][3] = 0.0f;
+		matrix.m[1][0] = m.m[0][1]; matrix.m[1][1] = m.m[1][1]; matrix.m[1][2] = m.m[2][1]; matrix.m[1][3] = 0.0f;
+		matrix.m[2][0] = m.m[0][2]; matrix.m[2][1] = m.m[1][2]; matrix.m[2][2] = m.m[2][2]; matrix.m[2][3] = 0.0f;
+		matrix.m[3][0] = -(m.m[3][0] * matrix.m[0][0] + m.m[3][1] * matrix.m[1][0] + m.m[3][2] * matrix.m[2][0]);
+		matrix.m[3][1] = -(m.m[3][0] * matrix.m[0][1] + m.m[3][1] * matrix.m[1][1] + m.m[3][2] * matrix.m[2][1]);
+		matrix.m[3][2] = -(m.m[3][0] * matrix.m[0][2] + m.m[3][1] * matrix.m[1][2] + m.m[3][2] * matrix.m[2][2]);
+		matrix.m[3][3] = 1.0f;
 		return matrix;
 	}
 
@@ -344,7 +380,14 @@ public:
 
     
     // Updates graphics.
-    FRESULT Update(std::vector<Player::PlayerState*>& player_states, bool8 state_got, uint64 delta_time) {
+    FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, uint64 delta_time ) {
+        
+        int8 x_cam_dir = glfwGetKey( window, GLFW_KEY_RIGHT );
+        x_cam_dir -= glfwGetKey( window, GLFW_KEY_LEFT );
+        int8 y_cam_dir = glfwGetKey( window, GLFW_KEY_UP );
+        y_cam_dir -= glfwGetKey( window, GLFW_KEY_DOWN );
+        vCamera.x += 0.1f * x_cam_dir;
+        vCamera.y += 0.1f * y_cam_dir;
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -359,7 +402,7 @@ public:
             glfwGetFramebufferSize(window, &width, &height);
 
             if (height != framebuffer_height || width != framebuffer_width) {
-                printf("size changed");
+                printf("Size changed.\n");
                 framebuffer_height = height;
                 framebuffer_width = width;
                 matProj = matrix_make_projection(90.0, (float32) framebuffer_height / (float32) framebuffer_width, 0.1f, 1000.0f);
@@ -375,7 +418,7 @@ public:
 
             // Set up rotation matrices
             mat4x4 matRotZ, matRotX;
-            fTheta += 0.001f * delta_time;
+            //fTheta += 0.001f * delta_time;
 
             matRotX = matrix_make_rotation_x( fTheta );
             matRotZ = matrix_make_rotation_z( fTheta );
@@ -385,14 +428,21 @@ public:
 
             mat4x4 matWorld;
             matWorld = matrix_make_identity();
-            matWorld = matrix_multiply_matrix(matRotZ, matRotX);
-            matWorld = matrix_multiply_matrix(matWorld, matTrans);
+            matWorld = matrix_multiply_matrix( matRotZ, matRotX );
+            matWorld = matrix_multiply_matrix( matWorld, matTrans );
+
+            vLookDir = {0, 0, 1};
+            vec3d vUp = {0, 1, 0};
+            vec3d vTarget = vector_add( vCamera, vLookDir );
+
+            mat4x4 matCamera = matrix_point_at( vCamera, vTarget, vUp );
+            mat4x4 matView = matrix_quick_inverse( matCamera );
 
             std::vector<triangle> vecTrianglesToRaster;
             
             for( auto tri : meshCube.tris ) {
 
-                triangle triProjected, triTransformed;
+                triangle triProjected, triTransformed, triViewed;
 
                 triTransformed.p[0] = matrix_multiply_vector( matWorld, tri.p[0] );
                 triTransformed.p[1] = matrix_multiply_vector( matWorld, tri.p[1] );
@@ -418,17 +468,22 @@ public:
                 {
                     
                     // Illumination
-                    vec3d light_direction =  {0.0f, 0.0f, -1.0f};
+                    vec3d light_direction =  {0.0f, 1.0f, -1.0f};
                     light_direction = vector_normalize( light_direction );
                     float32 dp = vector_dot_product( light_direction, normal );
                     if (dp < 0.1f) dp = 0.1f;
 
                     get_color_by_lum(dp, triTransformed.color);
 
+                    // Convert world space -> view space
+                    triViewed.p[0] = matrix_multiply_vector(matView, triTransformed.p[0]);
+                    triViewed.p[1] = matrix_multiply_vector(matView, triTransformed.p[1]);
+                    triViewed.p[2] = matrix_multiply_vector(matView, triTransformed.p[2]);
+
                     // Project triangles from 3D --> 2D
-                    triProjected.p[0] = matrix_multiply_vector(matProj, triTransformed.p[0]);
-                    triProjected.p[1] = matrix_multiply_vector(matProj, triTransformed.p[1]);
-                    triProjected.p[2] = matrix_multiply_vector(matProj, triTransformed.p[2]);
+                    triProjected.p[0] = matrix_multiply_vector(matProj, triViewed.p[0]);
+                    triProjected.p[1] = matrix_multiply_vector(matProj, triViewed.p[1]);
+                    triProjected.p[2] = matrix_multiply_vector(matProj, triViewed.p[2]);
 
                     triProjected.color = triTransformed.color;
 
@@ -504,7 +559,7 @@ private:
     std::map<uint32, history_pos> player_positions;
 
     bool8 history_mode_on = true;
-    size_t max_history_len = 20;
+    size_t max_history_len = 100;
 
 
     
@@ -571,7 +626,7 @@ FRESULT create_window(GraphicsHandle& handle) {
     glLoadIdentity();                           // start with identity matrix
 
     // Oh my god. This is amazing. We DON'T HAVE TO SCALE STUFF MANUALLY!!!!!
-    glOrtho(0.0, window_coord_height, 0.0, window_coord_width, -1.0, 1.0);   // setup a 10x10x2 viewing world
+    glOrtho(0.0, window_coord_width, 0.0, window_coord_height, -1.0, 10000.0);
     
     glfwSwapInterval(1);
 
