@@ -8,9 +8,17 @@ const char *vertexShaderSource = "#version 330 core\n"
     "}\0";
 
 
-const char *fragmentShaderSource = "#version 330 core\n"
+const char *fragmentShaderSource_1 = "#version 330 core\n"
     "out vec4 FragColor;\n"
     "void main()\n"
     "{\n"
     "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
+    "}\0";
+
+
+const char *fragmentShaderSource_2 = "#version 330 core\n"
+    "out vec4 FragColor;\n"
+    "void main()\n"
+    "{\n"
+    "   FragColor = vec4(0.5f, 0.5f, 0.0f, 1.0f);\n"
     "}\0";
