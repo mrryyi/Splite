@@ -725,7 +725,7 @@ public:
                 for (auto &t : listTriangles)
                 {
                     draw_triangle_filled( t );
-                    //DrawTriangle(t.p[0].x, t.p[0].y, t.p[1].x, t.p[1].y, t.p[2].x, t.p[2].y, PIXEL_SOLID, FG_BLACK);
+                        draw_triangle( t );
                 }
             }
 
