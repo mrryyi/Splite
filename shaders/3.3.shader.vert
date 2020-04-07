@@ -6,6 +6,7 @@ out vec3 ourColor; // output a color to the fragment shader
 
 void main()
 {
-    gl_Position = vec4(aPos, 1.0);
+    // Invert x and y.
+    gl_Position = vec4(-aPos.xy, aPos.z, 1.0);
     ourColor = aColor; // set ourColor to the input color we got from the vertex data
 }
