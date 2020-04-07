@@ -1,13 +1,13 @@
 #pragma once
 #include "pre.h"
 #include "game.h"
+#include "shaders.h"
 // Our fancy schmancy graphics handler
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <fstream>
 #include <strstream>
-#include <algorithm>
-#include <list>
+
 
 namespace graphics
 {
@@ -468,22 +468,129 @@ public:
     float32 sc = 1.0;
     GLFWwindow* window;
 
+    unsigned int vertexShader;
+    unsigned int fragmentShader;
+    unsigned int shaderProgram;
+
+    unsigned int VBO;
+    unsigned int VAO;
+
     GraphicsHandle() {
         
-        meshCube.load_from_object_file("../obj/teapot_minusz.obj");
+        //meshCube.load_from_object_file("../obj/teapot_minusz.obj");
         
     }
 
+    ~GraphicsHandle() {
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+    }
 
+    void init() {
+
+
+
+
+
+        
+
+
+
+
+
+        vertexShader = glCreateShader( GL_VERTEX_SHADER );
+        glShaderSource( vertexShader, 1, &vertexShaderSource, NULL );
+        glCompileShader( vertexShader );
+
+        int  success;
+        char infoLog[512];
+        glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success );
+
+        if( !success ) {
+            glGetShaderInfoLog( vertexShader, 512, NULL, infoLog );
+            printf("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog);
+        }
+
+        fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+        glCompileShader(fragmentShader);
+        glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+
+        if ( !success ) {
+            glGetShaderInfoLog( fragmentShader, 512, NULL, infoLog );
+            printf("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
+        }
+
+        shaderProgram = glCreateProgram();
+
+        glAttachShader( shaderProgram, vertexShader );
+        glAttachShader( shaderProgram, fragmentShader );
+        glLinkProgram( shaderProgram );
+
+        glGetProgramiv( shaderProgram, GL_LINK_STATUS, &success );
+        if ( !success ) {
+            glGetProgramInfoLog( shaderProgram, 512, NULL, infoLog );
+            printf("ERROR::SHADER::PROGRAM::LINK_FAILED\n%s\n", infoLog);
+        }
+        
+        // Every shader and rendering call after glUseProgram will now use this program object (and thus the shaders)
+        glUseProgram( shaderProgram );
+
+        // Oh yeah, and don't forget to delete the shader objects 
+        // once we've linked them into the program object; we no longer need them anymore:
+        glDeleteShader( vertexShader );
+        glDeleteShader( fragmentShader );
+
+        float32 vertices[] = {
+            -0.5f, -0.5f, 0.0f,
+            0.5f, -0.5f, 0.0f,
+            0.0f,  0.5f, 0.0f
+        };
+
+        glGenBuffers( 1, &VBO );
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray( VAO );
+        glBindBuffer( GL_ARRAY_BUFFER, VBO );
+        glBufferData( GL_ARRAY_BUFFER, sizeof( vertices ), vertices, GL_STATIC_DRAW );
+
+        // Right now we sent the input vertex data to the GPU and instructed the GPU how it
+        // should process the vertex data within a vertex and fragment shader. We're almost there,
+        // but not quite yet. OpenGL does not yet know how it should interpret the vertex data in
+        // memory and how it should connect the vertex data to the vertex shader's attributes.
+        // We'll be nice and tell OpenGL how to do that.
+
+        glVertexAttribPointer(0,        // Location of the vertex position vertex attribute
+                              3,        // Size of the vertex attribute (3 coordinates);
+                              GL_FLOAT, // Type of data
+                              GL_FALSE, // If we want the data to be normalized.
+                              3 * sizeof( float32 ), // Space between consecutive vertex attributes.
+                              (void*) 0 // Where the position data begins in the buffer.
+                              );
+        glEnableVertexAttribArray(0); 
+
+
+    }
+
+    
 
     
     // Updates graphics.
     FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
 
+
         if ( !window ) {
             return FRESULT(FR_FAILURE);
         }
         else {
+            // state-setting function
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            // state-using function
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glUseProgram(shaderProgram);
+            glBindVertexArray(VAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            
 
             if ( history_mode_on ) {
                 render_players_with_history( player_states, state_got );
@@ -613,7 +720,6 @@ FRESULT init() {
 };
 
 FRESULT terminate() {
-
     glfwTerminate();
     return FRESULT(FR_OK);
 

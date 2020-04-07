@@ -36,6 +36,8 @@ int main() {
     }
 
     glViewport(0, 0, window_coord_width, window_coord_height);
+
+    graphics_handle.init();
     
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
