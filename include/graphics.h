@@ -474,6 +474,8 @@ public:
     unsigned int shaderProgram_1;
     unsigned int shaderProgram_2;
 
+    Shader ourShader;
+
     unsigned int VBOs[2];
     unsigned int VAOs[2];
     unsigned int EBO;
@@ -491,91 +493,25 @@ public:
 
     void init() {
 
-
-
-
-
-        
-
-
-
+        ourShader = Shader("../shaders/3.3.shader.vs", "../shaders/3.3.shader.fs");
 
         int  success;
         char infoLog[512];
 
-        vertexShader = glCreateShader( GL_VERTEX_SHADER );
-        fragmentShader_1 = glCreateShader(GL_FRAGMENT_SHADER);
-        fragmentShader_2 = glCreateShader(GL_FRAGMENT_SHADER);
-        shaderProgram_1 = glCreateProgram();
-        shaderProgram_2 = glCreateProgram();
-        glShaderSource( vertexShader, 1, &vertexShaderSource, NULL );
-        glCompileShader( vertexShader );
-        glShaderSource(fragmentShader_1, 1, &fragmentShaderSource_1, NULL);
-        glCompileShader(fragmentShader_1);
-        glShaderSource(fragmentShader_2, 1, &fragmentShaderSource_2, NULL);
-        glCompileShader(fragmentShader_2);
-        // Link first program
-        glAttachShader( shaderProgram_2, vertexShader );
-        glAttachShader( shaderProgram_2, fragmentShader_2 );
-        glLinkProgram( shaderProgram_2 );
-        // Link second program
-        glAttachShader( shaderProgram_1, vertexShader );
-        glAttachShader( shaderProgram_1, fragmentShader_1 );
-        glLinkProgram( shaderProgram_1 );
-
-        glGetShaderiv( vertexShader, GL_COMPILE_STATUS, &success );
-        if( !success ) {
-            glGetShaderInfoLog( vertexShader, 512, NULL, infoLog );
-            printf("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n%s\n", infoLog);
-        }
-        glGetShaderiv(fragmentShader_1, GL_COMPILE_STATUS, &success);
-        if ( !success ) {
-            glGetShaderInfoLog( fragmentShader_1, 512, NULL, infoLog );
-            printf("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
-        }
-        glGetShaderiv(fragmentShader_2, GL_COMPILE_STATUS, &success);
-        if ( !success ) {
-            glGetShaderInfoLog( fragmentShader_2, 512, NULL, infoLog );
-            printf("ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n%s\n", infoLog);
-        }
-        glGetProgramiv( shaderProgram_1, GL_LINK_STATUS, &success );
-        if ( !success ) {
-            glGetProgramInfoLog( shaderProgram_1, 512, NULL, infoLog );
-            printf("ERROR::SHADER::PROGRAM::LINK_FAILED\n%s\n", infoLog);
-        }
-
-        glGetProgramiv( shaderProgram_2, GL_LINK_STATUS, &success );
-        if ( !success ) {
-            glGetProgramInfoLog( shaderProgram_2, 512, NULL, infoLog );
-            printf("ERROR::SHADER::PROGRAM::LINK_FAILED\n%s\n", infoLog);
-        }
-
-        // Don't forget to delete the shader objects 
-        // once we've linked them into the program object; we no longer need them anymore:
-        glDeleteShader( vertexShader );
-        glDeleteShader( fragmentShader_1 );
-        glDeleteShader( fragmentShader_2 );
-
+        // set up vertex data (and buffer(s)) and configure vertex attributes
+        // ------------------------------------------------------------------
         float t1_vertices[] = {
-        // first triangle
-        -0.9f, -0.5f, 0.0f,  // left 
-        -0.0f, -0.5f, 0.0f,  // right
-        -0.45f, 0.5f, 0.0f,  // top 
+            // positions         // colors
+            0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // bottom right
+            -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // bottom left
+            0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // top 
         };
-        float t2_vertices[] = {
-        // second triangle
-         0.0f, -0.5f, 0.0f,  // left
-         0.9f, -0.5f, 0.0f,  // right
-         0.45f, 0.5f, 0.0f   // top 
-        }; 
-
-
         
         glGenBuffers( 2, VBOs );
         glGenVertexArrays( 2, VAOs );
 
-        // First triangle setup
-        //. Bind to first VAO.
+        // Setup for this triangle.
+        //. Bind to first VAO (position attribute)
         glBindVertexArray( VAOs[0] );
         glBindBuffer( GL_ARRAY_BUFFER, VBOs[0] );
         glBufferData( GL_ARRAY_BUFFER, sizeof( t1_vertices ), t1_vertices, GL_STATIC_DRAW );
@@ -583,32 +519,21 @@ public:
                               3,        // Size of the vertex attribute (3 coordinates);
                               GL_FLOAT, // Type of data
                               GL_FALSE, // If we want the data to be normalized.
-                              3 * sizeof( float32 ), // Space between consecutive vertex attributes.
+                              6 * sizeof( float32 ), // Space between consecutive vertex attribute first positions.
                               (void*) 0 // Where the position data begins in the buffer.
                               );
         glEnableVertexAttribArray( 0 );
+        
+        //. Bind to second VAO (color attribute)
+        glVertexAttribPointer(1,        // attribute location 1
+                              3,        // 3 values
+                              GL_FLOAT, // value of type float
+                              GL_FALSE, // not normalize
+                              6 * sizeof( float32 ), // We have to stride 6 floats between beginnings of color values
+                              (void*) (3*sizeof(float)) // Color attribute starts after this offset.
+                              );
+        glEnableVertexAttribArray( 1 );
         // glBindVertexArray( 0 ); // No need to unbind as we bind the next line.
-
-        // Second triangle setup
-        //. Bind to second VAO.
-        glBindVertexArray( VAOs[1] );
-        glBindBuffer( GL_ARRAY_BUFFER, VBOs[1] );
-        glBufferData( GL_ARRAY_BUFFER, sizeof( t2_vertices ), t2_vertices, GL_STATIC_DRAW );
-        glVertexAttribPointer(0,        // Location of the vertex position vertex attribute
-                              3,        // Size of the vertex attribute (3 coordinates);
-                              GL_FLOAT, // Type of data
-                              GL_FALSE, // If we want the data to be normalized.
-                              3 * sizeof( float32 ), // Space between consecutive vertex attributes.
-                              (void*) 0 // Where the position data begins in the buffer.
-                              );
-        glEnableVertexAttribArray( 0 );
-        glBindVertexArray( 0 );
-        // Right now we sent the input vertex data to the GPU and instructed the GPU how it
-        // should process the vertex data within a vertex and fragment shader. We're almost there,
-        // but not quite yet. OpenGL does not yet know how it should interpret the vertex data in
-        // memory and how it should connect the vertex data to the vertex shader's attributes.
-        // We'll be nice and tell OpenGL how to do that.
-
         
         glEnableVertexAttribArray(0); 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -626,25 +551,17 @@ public:
             return FRESULT(FR_FAILURE);
         }
         else {
+
             // state-setting function
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
             // state-using function
             glClear(GL_COLOR_BUFFER_BIT);
 
-            
+
             // Draw first triangle using data from the first VAO
-            glUseProgram(shaderProgram_1);
+            ourShader.use();
             glBindVertexArray( VAOs[0] );
             glDrawArrays(GL_TRIANGLES, 0, 3);
-
-            glUseProgram(shaderProgram_2);
-            // Draw seconds triangle using data from the second VAO
-            glBindVertexArray( VAOs[1] );
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-
-            // triangles, 6 vertices, type of index, 0
-            //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-            glDrawArrays(GL_TRIANGLES, 0, 6); // 6 vertices, (2 triangles).
 
             if ( history_mode_on ) {
                 render_players_with_history( player_states, state_got );
