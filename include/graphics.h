@@ -3,9 +3,9 @@
 #include "game.h"
 #include "shader.h"
 #include "graphicsfunc.h"
+#include "stb_image.h"
 // Our fancy schmancy graphics handler
 #include <GLFW/glfw3.h>
-
 namespace graphics
 {
 
@@ -100,9 +100,14 @@ public:
 
     Shader ourShader;
 
+    
+    unsigned int texture1;
+
     unsigned int VBOs[2];
     unsigned int VAOs[2];
-    unsigned int EBO;
+    unsigned int EBOs[2];
+
+
 
     GraphicsHandle() {
         
@@ -113,54 +118,88 @@ public:
     ~GraphicsHandle() {
         glDeleteVertexArrays(2, VAOs);
         glDeleteBuffers(2, VBOs);
+        glDeleteBuffers(2, EBOs);
     }
 
-    void init() {
+    void init() {glEnable(GL_BLEND);
+glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         ourShader = Shader("../shaders/3.3.shader.vert", "../shaders/3.3.shader.frag");
 
         int  success;
         char infoLog[512];
 
+
         // set up vertex data (and buffer(s)) and configure vertex attributes
         // ------------------------------------------------------------------
-        float t1_vertices[] = {
-            // positions         // colors
-            0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // bottom right
-            -0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // bottom left
-            0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // top 
+        float vertices[] = {
+            // positions          // colors           // texture coords
+            0.5f,  0.5f, 0.0f,   1.0f, 0.0f, 0.0f,   1.0f, 1.0f,   // top right
+            0.5f, -0.5f, 0.0f,   0.0f, 1.0f, 0.0f,   1.0f, 0.0f,   // bottom right
+            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f, 1.0f,   0.0f, 0.0f,   // bottom left
+            -0.5f,  0.5f, 0.0f,   1.0f, 1.0f, 0.0f,   0.0f, 1.0f    // top left 
+        };
+
+        unsigned int indices[] = {  
+            0, 1, 3, // first triangle
+            1, 2, 3  // second triangle
         };
         
         glGenBuffers( 2, VBOs );
         glGenVertexArrays( 2, VAOs );
+        glGenBuffers(2, EBOs);
 
         // Setup for this triangle.
-        //. Bind to first VAO (position attribute)
         glBindVertexArray( VAOs[0] );
+        
         glBindBuffer( GL_ARRAY_BUFFER, VBOs[0] );
-        glBufferData( GL_ARRAY_BUFFER, sizeof( t1_vertices ), t1_vertices, GL_STATIC_DRAW );
-        glVertexAttribPointer(0,        // Location of the vertex position vertex attribute
-                              3,        // Size of the vertex attribute (3 coordinates);
-                              GL_FLOAT, // Type of data
-                              GL_FALSE, // If we want the data to be normalized.
-                              6 * sizeof( float32 ), // Space between consecutive vertex attribute first positions.
-                              (void*) 0 // Where the position data begins in the buffer.
-                              );
-        glEnableVertexAttribArray( 0 );
-        
-        //. Bind to second VAO (color attribute)
-        glVertexAttribPointer(1,        // attribute location 1
-                              3,        // 3 values
-                              GL_FLOAT, // value of type float
-                              GL_FALSE, // not normalize
-                              6 * sizeof( float32 ), // We have to stride 6 floats between beginnings of color values
-                              (void*) (3*sizeof(float)) // Color attribute starts after this offset.
-                              );
-        glEnableVertexAttribArray( 1 );
-        // glBindVertexArray( 0 ); // No need to unbind as we bind the next line.
-        
-        glEnableVertexAttribArray(0); 
+        glBufferData( GL_ARRAY_BUFFER, sizeof( vertices ), vertices, GL_STATIC_DRAW );
+
+        glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, EBOs[0] );
+        glBufferData( GL_ELEMENT_ARRAY_BUFFER, sizeof( indices ), indices, GL_STATIC_DRAW);
+
+        // position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        // color attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        // texture coord attribute
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        // glBindVertexArray( 0 ); // No need to unbind
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        
+
+
+        // Textures
+        glGenTextures(1, &texture1);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+         // set the texture wrapping parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // set texture filtering parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        int width, height, nr_channels;
+        unsigned char *data;
+
+        stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+        
+        data = stbi_load("../textures/container.jpg", &width, &height, &nr_channels, 0);
+        if ( data ) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else {
+            printf("Failed to load texture.\n");
+        }
+        stbi_image_free( data );
+
+        ourShader.use();
+        ourShader.setInt("texture1", 0);
 
     }
     
@@ -178,10 +217,13 @@ public:
             // state-using function
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // Draw first triangle using data from the first VAO
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE, texture1);
+
             ourShader.use();
-            glBindVertexArray( VAOs[0] );
-            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(VAOs[0]);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 
             if ( history_mode_on ) {
                 render_players_with_history( player_states, state_got );
@@ -286,7 +328,7 @@ FRESULT create_window(GraphicsHandle& handle) {
     }
 
     glfwMakeContextCurrent(handle.window);
-    
+
     glfwSwapInterval(1);
 
     glfwSetFramebufferSizeCallback(handle.window, framebuffer_size_callback); 

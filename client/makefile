@@ -9,7 +9,7 @@ LIBRARIES =
 LDFLAGS = $(LIBRARIES) -lwsock32  -lglfw3 -lopengl32 -lgdi32 -lglu32
 
 TARGET = client.exe
-cpp_files = main.cpp
+cpp_files = main.cpp stb_image.cpp
 c_files = glad.c
 objects = $(cpp_files:.cpp=.o) $(c_files:.cpp=.o)
 
