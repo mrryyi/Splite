@@ -4,7 +4,6 @@
 #include "shader.h"
 #include "graphicsfunc.h"
 #include "stb_image.h"
-// Our fancy schmancy graphics handler
 #include <GLFW/glfw3.h>
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -114,6 +113,10 @@ public:
 
     // world space positions of our cubes
     std::vector<glm::vec3> cubePositions;
+
+    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
+    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
     GraphicsHandle() {
         
@@ -242,10 +245,19 @@ public:
         ourShader.use();
         ourShader.setInt("texture1", 0);
     }
-    
+
     // Updates graphics.
     FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
 
+        float32 cameraSpeed = 0.01f * delta_time;
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            cameraPos += cameraSpeed * cameraFront;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            cameraPos -= cameraSpeed * cameraFront;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -265,8 +277,9 @@ public:
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
-            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
-            view       = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+            projection = glm::perspective(glm::radians(45.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
+            
+            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
             // pass transformation matrices to the shader
             ourShader.setMat4f("projection", projection); // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
             ourShader.setMat4f("view", view);
