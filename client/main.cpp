@@ -115,7 +115,7 @@ int main() {
 
     std::vector<Player::PlayerState*> player_states;
 
-    Player::PlayerState last_known_player_state(NO_ID_GIVEN, 0.0, 0.0, 0.0, 0.0);
+    Player::PlayerState last_known_player_state( NO_ID_GIVEN, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) );
     player_states.push_back(&last_known_player_state);
     uint32 local_player_state_i;
     bool8 connected = false;
@@ -242,14 +242,8 @@ int main() {
 
         Player::PlayerInput old_input = input;
 
-        process_input( graphics_handle.window );
-        
-        // Get input
-        input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
-        input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
-        input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
-        input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
-        input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
+        // Now we have pitch and yaw into our input.
+        process_input( graphics_handle, input );
         
         if ( connected && id_from_server != NO_ID_GIVEN ) {
 
@@ -272,7 +266,11 @@ int main() {
             }
 
         }
+        
+        Player::print_player_input(input);
+        Player::print_player_state(last_known_player_state);
 
+        graphics_handle.camera.SetCamera( last_known_player_state.position, last_known_player_state.yaw, last_known_player_state.pitch );
 
         // Update graphics
         // Should take in a gamestate object.

@@ -137,7 +137,7 @@ uint32 server_msg_connection_write( uint8* buffer ) {
 
 
 uint32 server_msg_player_states_write( uint8* buffer, std::vector<Player::PlayerState> player_states, uint64 tick ) {
-    assert(player_state.size() > 0);
+    assert(player_states.size() > 0);
     
     uint8* iterator = buffer;
 

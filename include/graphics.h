@@ -62,7 +62,7 @@ public:
 
 
 class GraphicsHandle {
-private:
+public:
     mesh meshCube;
     mat4x4 matProj;
 
@@ -96,8 +96,6 @@ private:
     float32 last_mouse_y = window_coord_height / 2.0f;
     bool firstMouse = true;
 
-public:
-
     const float DEG2RAD = 3.14159 / 180;
     float radius = 0.25;
 
@@ -113,7 +111,6 @@ public:
     Shader ourShader;
 
     Camera camera;
-
     
     unsigned int texture1;
     unsigned int texture2;
@@ -271,44 +268,8 @@ public:
         ourShader.setInt("texture1", 0);
     }
 
-    void handle_keyboard_input(float32 delta_time) {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
-
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            camera.ProcessKeyboard(FORWARD, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            camera.ProcessKeyboard(BACKWARD, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            camera.ProcessKeyboard(LEFT, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            camera.ProcessKeyboard(RIGHT, delta_time);
-    };
-
-    void handle_mouse_input() {
-        GLdouble x_pos_now, y_pos_now;
-        glfwGetCursorPos(window, &x_pos_now, &y_pos_now);
-
-        if ( firstMouse ) {
-            last_mouse_x = x_pos_now;
-            last_mouse_y = y_pos_now;
-            firstMouse = false;
-        }
-
-        float32 x_offset = x_pos_now - last_mouse_x;
-        float32 y_offset = last_mouse_y - y_pos_now;
-
-        last_mouse_x = x_pos_now;
-        last_mouse_y = y_pos_now;
-
-        camera.ProcessMouseMovement( x_offset, y_offset );
-    };
-
     // Updates graphics.
     FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
-
-        handle_keyboard_input(delta_time);
-        handle_mouse_input();
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -350,7 +311,6 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
-
             if ( history_mode_on ) {
                 render_players_with_history( player_states, state_got );
             }
@@ -374,13 +334,11 @@ public:
         }
     }
 
-private:
-
-    struct vector2f {
-        float64 x, y;
+    struct vector3f {
+        float32 x, y, z;
     };
 
-    struct client_history_pos : vector2f {
+    struct client_history_pos : vector3f {
         bool8 state_got;
     };
 
@@ -393,8 +351,6 @@ private:
     
     void render_player(Player::PlayerState* ps, bool8 state_got) {
 
-        Rect_w rect = Rect_w(ps->x, ps->y, player_width, player_height);
-        rect.render( state_got );
 
     }
 
@@ -415,13 +371,13 @@ private:
             // Add player to history map.
             if ( player_positions.count( player_id ) < 1 ) {
                 history_pos hpos;
-                player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
+                //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
             }
 
             if ( player_positions.count( player_id )) {
 
                 // Add new position to history
-                player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
+                //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
 
                 // Delete oldest history pos.
                 if ( player_positions[player_id].size() > max_history_len ) {

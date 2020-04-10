@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pre.h"
+#include "glm/glm.hpp"
 
 namespace Network
 {
@@ -50,6 +51,12 @@ static void write_float64(uint8** buffer, float64 f64) {
     *buffer += sizeof( f64 );
 };
 
+static void write_vec3f(uint8** buffer, glm::vec3 vec3f) {
+    write_float32(buffer, vec3f.x);
+    write_float32(buffer, vec3f.y);
+    write_float32(buffer, vec3f.z);
+}
+
 static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
 
     //  [var]  [compressed]  [how much to shift for desired bit position]
@@ -59,32 +66,41 @@ static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
     //  right  .... r...     << 3
     //  jump   ...j ....     << 4
     uint8 compressed_input = 
-        (uint8)(input->up   ? 1 << 0 : 0) |
-        (uint8)(input->down ? 1 << 1 : 0) |
-        (uint8)(input->left ? 1 << 2 : 0) |
-        (uint8)(input->right? 1 << 3 : 0) |
-        (uint8)(input->jump ? 1 << 4 : 0);
+        (uint8)(input->forward)  ? 1 << 0 : 0  |
+        (uint8)(input->backward) ? 1 << 1 : 0  |
+        (uint8)(input->up        ? 1 << 2 : 0) |
+        (uint8)(input->down      ? 1 << 3 : 0) |
+        (uint8)(input->left      ? 1 << 4 : 0) |
+        (uint8)(input->right     ? 1 << 5 : 0) |
+        (uint8)(input->jump      ? 1 << 6 : 0);
+    
     
     write_uint8(buffer, compressed_input);
     
+    write_float32(buffer, input->yaw);
+    write_float32(buffer, input->pitch);
 };
 
 static void write_player_input_verbose(uint8** buffer, Player::PlayerInput* input) {
+    write_uint8(buffer, input->forward);
+    write_uint8(buffer, input->backward);
     write_uint8(buffer, input->up);
     write_uint8(buffer, input->down);
     write_uint8(buffer, input->left);
     write_uint8(buffer, input->right);
     write_uint8(buffer, input->jump);
+
+    write_float32(buffer, input->yaw);
+    write_float32(buffer, input->pitch);
 };
 
 static void write_player_state(uint8** buffer, const Player::PlayerState* ps) {
     write_uint32(buffer, ps->id);
-    write_float64(buffer, ps->x);
-    write_float64(buffer, ps->y);
-    write_float32(buffer, ps->speed_x);
-    write_float32(buffer, ps->speed_y);
+    write_vec3f(buffer, ps->position);
+    write_vec3f(buffer, ps->velocity);
+    write_float32(buffer, ps->yaw);
+    write_float32(buffer, ps->pitch);
 };
-
 
 static void read_uint8(uint8** buffer, uint8* ui8) {
     // Set value of dereferenced pointer to value at buffer iterator.
@@ -116,11 +132,6 @@ static void read_int64(uint8** buffer, int64* i64) {
     *buffer += sizeof( *i64 );
 };
 
-static void read_float64(uint8** buffer, float64* f64) {
-    memcpy(f64, *buffer, sizeof( *f64 ));
-    *buffer += sizeof( *f64 );
-};
-
 static void read_float32(uint8** buffer, float32* f32) {
     // *buffer means the address of the value we want to start at.
     // We read bytes equal to the third argument.
@@ -128,32 +139,54 @@ static void read_float32(uint8** buffer, float32* f32) {
     *buffer += sizeof( *f32 );
 };
 
+static void read_float64(uint8** buffer, float64* f64) {
+    memcpy(f64, *buffer, sizeof( *f64 ));
+    *buffer += sizeof( *f64 );
+};
+
+static void read_vec3f(uint8** buffer, glm::vec3* vec3f) {
+    read_float32(buffer, &vec3f->x);
+    read_float32(buffer, &vec3f->y);
+    read_float32(buffer, &vec3f->z);
+}
+
+
 static void read_player_input(uint8** buffer, Player::PlayerInput* input) {
     uint8 compressed = 0;
     read_uint8(buffer, &compressed);
     
     // Assign values to separate variables from compressed byte.
-    input->up       = compressed & 1;
-	input->down     = compressed & (1 << 1);
-	input->left     = compressed & (1 << 2);
-	input->right    = compressed & (1 << 3);
-	input->jump     = compressed & (1 << 4);
+    input->forward      = compressed & 1;
+	input->backward     = compressed & (1 << 1);
+	input->up           = compressed & (1 << 2);
+	input->down         = compressed & (1 << 3);
+	input->left         = compressed & (1 << 4);
+    input->right        = compressed & (1 << 5);
+    input->jump         = compressed & (1 << 6);
+
+    read_float32(buffer, &input->yaw);
+    read_float32(buffer, &input->pitch);
 };
 
 static void read_player_input_verbose(uint8** buffer, Player::PlayerInput* input) {
+    read_uint8(buffer, &input->forward);
+    read_uint8(buffer, &input->backward);
     read_uint8(buffer, &input->up);
     read_uint8(buffer, &input->down);
     read_uint8(buffer, &input->left);
     read_uint8(buffer, &input->right);
     read_uint8(buffer, &input->jump);
+    
+    read_float32(buffer, &input->yaw);
+    read_float32(buffer, &input->pitch);
 };
 
 static void read_player_state(uint8** buffer, Player::PlayerState* ps) {
     read_uint32(buffer, &ps->id);
-    read_float64(buffer, &ps->x);
-    read_float64(buffer, &ps->y);
-    read_float32(buffer, &ps->speed_x);
-    read_float32(buffer, &ps->speed_y);
+    read_vec3f(buffer, &ps->position);
+    read_vec3f(buffer, &ps->velocity);
+    read_float32(buffer, &ps->yaw);
+    read_float32(buffer, &ps->pitch);
 };
 
 }

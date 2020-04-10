@@ -1,6 +1,8 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#include  "def.h"
+
 #include <glad/glad.h>
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -79,10 +81,18 @@ public:
         if (direction == RIGHT)
             Position += Right * velocity;
     }
+    
+    // Set position by state.
+    void SetCamera( glm::vec3& position, float32 yaw, float32 pitch ) {
 
-    // Processes input received from a mouse input system. Expects the offset value in both the x and y direction.
-    void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
-    {
+        Position = position;
+        Yaw = yaw;
+        Pitch = pitch;
+        updateCameraVectors();
+
+    }
+
+    void LoadMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true) {
         xoffset *= MouseSensitivity;
         yoffset *= MouseSensitivity;
 
@@ -97,8 +107,12 @@ public:
             if (Pitch < -89.0f)
                 Pitch = -89.0f;
         }
+    }
 
-        // Update Front, Right and Up Vectors using the updated Euler angles
+    // Processes input received from a mouse input system. Expects the offset value in both the x and y direction.
+    void LoadAndProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true)
+    {
+        LoadMouseMovement(xoffset, yoffset, constrainPitch);
         updateCameraVectors();
     }
 
@@ -112,7 +126,6 @@ public:
         if (Zoom >= 45.0f)
             Zoom = 45.0f;
     }
-
 private:
     // Calculates the front vector from the Camera's (updated) Euler Angles
     void updateCameraVectors()
