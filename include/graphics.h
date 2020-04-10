@@ -1,10 +1,15 @@
 #pragma once
 #include "pre.h"
 #include "game.h"
+
+// Graphics
 #include "shader.h"
 #include "graphicsfunc.h"
 #include "stb_image.h"
 #include <GLFW/glfw3.h>
+#include "camera.h"
+
+// GL math
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -87,6 +92,10 @@ private:
         matProj.m[3][3] = 0.0;
     }
 
+    float32 last_mouse_x = window_coord_width / 2.0f;
+    float32 last_mouse_y = window_coord_height / 2.0f;
+    bool firstMouse = true;
+
 public:
 
     const float DEG2RAD = 3.14159 / 180;
@@ -102,6 +111,8 @@ public:
     unsigned int shaderProgram_2;
 
     Shader ourShader;
+
+    Camera camera;
 
     
     unsigned int texture1;
@@ -130,7 +141,20 @@ public:
         glDeleteBuffers(2, EBOs);
     }
 
-        void init() {glEnable(GL_BLEND);
+    void init() {
+
+        camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        
+        // Should enable blending of two textures.
+        // HASN'T WORKED SO FAR FOR SOME REASON BUT I DON'T
+        // CARE. WHO NEEDS BLENDED TEXTURES ANYWAY.
+        // IN FACT, WHO NEEDS ANY TEXTURES?
+        // LET'S JUST GET INSPIRED FROM SUPERHOT AND ONLY
+        // USE COLORS BUT IT STILL LOOKS SUPERCOOL (GET IT?)
+        // FOR SOME REASON
+        glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         ourShader = Shader("../shaders/3.3.shader.vert", "../shaders/3.3.shader.frag");
@@ -144,6 +168,7 @@ public:
         // set up vertex data (and buffer(s)) and configure vertex attributes
         // ------------------------------------------------------------------
         float vertices[] = {
+        // vertice coords  // color coords 
         -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
          0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
          0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
@@ -246,18 +271,44 @@ public:
         ourShader.setInt("texture1", 0);
     }
 
+    void handle_keyboard_input(float32 delta_time) {
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, true);
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            camera.ProcessKeyboard(FORWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            camera.ProcessKeyboard(BACKWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            camera.ProcessKeyboard(LEFT, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            camera.ProcessKeyboard(RIGHT, delta_time);
+    };
+
+    void handle_mouse_input() {
+        GLdouble x_pos_now, y_pos_now;
+        glfwGetCursorPos(window, &x_pos_now, &y_pos_now);
+
+        if ( firstMouse ) {
+            last_mouse_x = x_pos_now;
+            last_mouse_y = y_pos_now;
+            firstMouse = false;
+        }
+
+        float32 x_offset = x_pos_now - last_mouse_x;
+        float32 y_offset = last_mouse_y - y_pos_now;
+
+        last_mouse_x = x_pos_now;
+        last_mouse_y = y_pos_now;
+
+        camera.ProcessMouseMovement( x_offset, y_offset );
+    };
+
     // Updates graphics.
     FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
 
-        float32 cameraSpeed = 0.01f * delta_time;
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            cameraPos += cameraSpeed * cameraFront;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            cameraPos -= cameraSpeed * cameraFront;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        handle_keyboard_input(delta_time);
+        handle_mouse_input();
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -279,14 +330,13 @@ public:
             glm::mat4 projection    = glm::mat4(1.0f);
             projection = glm::perspective(glm::radians(45.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
             
-            view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+            view = camera.GetViewMatrix();
             // pass transformation matrices to the shader
             ourShader.setMat4f("projection", projection); // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
             ourShader.setMat4f("view", view);
 
-            
-
             glBindVertexArray(VAOs[0]);
+
             for(unsigned int i = 0; i < 10; i++) {
                     
                 // calculate the model matrix for each object and pass it to shader before drawing
@@ -407,7 +457,7 @@ FRESULT create_window(GraphicsHandle& handle) {
 
     glfwSwapInterval(1);
 
-    glfwSetFramebufferSizeCallback(handle.window, framebuffer_size_callback); 
+    glfwSetFramebufferSizeCallback(handle.window, framebuffer_size_callback);
 
     return FRESULT(FR_OK);
 }
