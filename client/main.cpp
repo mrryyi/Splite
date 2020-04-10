@@ -260,18 +260,15 @@ int main() {
 
             if ( i == local_player_state_i ) {
                 Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
+
+                graphics_handle.camera.SetCamera( player_states[i]->position, player_states[i]->yaw, player_states[i]->pitch );
+                Player::print_player_state(*player_states[i]);
             }
             else {
                 Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
             }
 
         }
-        
-        Player::print_player_input(input);
-        Player::print_player_state(last_known_player_state);
-
-        graphics_handle.camera.SetCamera( last_known_player_state.position, last_known_player_state.yaw, last_known_player_state.pitch );
-
         // Update graphics
         // Should take in a gamestate object.
         now = timeSinceEpochMillisec();

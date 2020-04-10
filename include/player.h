@@ -84,8 +84,8 @@ public:
 
 // Per millisecond
 constexpr float32 player_movement_speed_pms = 0.05;
-constexpr float32 player_jump_speed_pms = 2.0;
-constexpr float32 gravity_pms = 0.01;
+constexpr float32 player_jump_speed_pms = 0.05;
+constexpr float32 gravity_pms = 0.003;
 
 
 void tick_player_by_physics( PlayerState &player_state, float32 delta_time_ms ) {
@@ -127,39 +127,44 @@ void tick_player_by_input( PlayerState &player_state, PlayerInput &player_input,
         desired_movement_direction += right;
     }
 
-    bool8 no_direction;
+    bool8 jumping = false;
+
+    if( player_input.jump) {
+        jumping = true;
+    }
+
+    bool8 direction;
 
     if (glm::length(desired_movement_direction) == 0.0) {
-        no_direction = true;
+        direction = false;
     }
     else {
         desired_movement_direction = glm::normalize(desired_movement_direction);
-        no_direction = false;
+        direction = true;
     }
 
     glm::vec3 velocity;
 
     bool is_grounded = player_state.position.y == 0.0f;
 
-    if ( !no_direction ) {
-
-        if ( is_grounded ) {
+    if ( is_grounded ) {
+        if ( direction ) {
             velocity = desired_movement_direction * player_movement_speed_pms;
-            if ( player_input.jump ) {
-                velocity.y = player_jump_speed_pms;
-            }
         }
         else {
-            // If player's not grounded, we carry the previous velocity.
-            velocity = player_state.velocity;
+            velocity = {0.0, 0.0, 0.0};
         }
 
-    }
-    else {
-        if ( !is_grounded ) {
-            // If player's not grounded, we carry the previous velocity.
-            velocity = player_state.velocity;
+        if ( jumping ) {
+            glm::vec3 jumping_velocity = glm::vec3( 0.0f, player_jump_speed_pms, 0.0f);
+            velocity += jumping_velocity;
         }
+    }
+
+    if ( !is_grounded ) {
+
+        velocity = player_state.velocity;
+
     }
 
     player_state.velocity = velocity;

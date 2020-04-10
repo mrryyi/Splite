@@ -289,7 +289,7 @@ public:
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
-            projection = glm::perspective(glm::radians(45.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
+            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
             
             view = camera.GetViewMatrix();
             // pass transformation matrices to the shader
