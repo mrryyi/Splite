@@ -262,7 +262,7 @@ int main() {
                 Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
 
                 graphics_handle.camera.SetCamera( player_states[i]->position, player_states[i]->yaw, player_states[i]->pitch );
-                Player::print_player_state(*player_states[i]);
+                Player::print_player_state( *player_states[i] );
             }
             else {
                 Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
@@ -281,7 +281,7 @@ int main() {
 
         uint64 delta_frame_time = now - last_frame_ms;
         if ( delta_frame_time >= milliseconds_per_frame ) {
-            graphics_handle.Update( player_states, state_got_this_tick, milliseconds_per_frame );
+            graphics_handle.Update( player_states, local_player_state_i, state_got_this_tick, milliseconds_per_frame );
             last_frame_ms = now;
         }
 

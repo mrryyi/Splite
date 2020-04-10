@@ -104,7 +104,7 @@ void tick_player_by_input( PlayerState &player_state, PlayerInput &player_input,
 
     glm::vec3 front;
     front.x = cos(glm::radians(player_state.yaw)) * cos(glm::radians(player_state.pitch));
-    front.y = sin(glm::radians(player_state.pitch));
+    front.y = 0.0f; //sin(glm::radians(player_state.pitch));
     front.z = sin(glm::radians(player_state.yaw)) * cos(glm::radians(player_state.pitch));
     front = glm::normalize(front);
     // Also re-calculate the Right and Up vector

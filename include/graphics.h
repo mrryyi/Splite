@@ -269,7 +269,7 @@ public:
     }
 
     // Updates graphics.
-    FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
+    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got, float32 delta_time ) {
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -312,10 +312,10 @@ public:
             }
 
             if ( history_mode_on ) {
-                render_players_with_history( player_states, state_got );
+                render_players_with_history( player_states, local_id, state_got );
             }
             else {
-                render_players( player_states, state_got );
+                render_players( player_states, local_id, state_got );
             }
             
             glfwSwapBuffers(window);
@@ -350,45 +350,54 @@ public:
     size_t max_history_len = 100;
     
     void render_player(Player::PlayerState* ps, bool8 state_got) {
-
-
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, ps->position);
+        model = glm::rotate(model, glm::radians(ps->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(ps->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
+        ourShader.setMat4f("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
-    void render_players(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for( size_t i = 0; i < player_states.size(); i++) {
-            render_player(player_states[i], state_got);
+            if ( player_states[i]->id != local_id ) {
+                render_player(player_states[i], state_got);
+            }
         }
 
     }
 
-    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for(int i = 0; i < player_states.size(); i++) {
 
             uint32 player_id = player_states[i]->id;
 
-            // Add player to history map.
-            if ( player_positions.count( player_id ) < 1 ) {
-                history_pos hpos;
-                //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
-            }
+            if (player_id != local_id ) {
 
-            if ( player_positions.count( player_id )) {
-
-                // Add new position to history
-                //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
-
-                // Delete oldest history pos.
-                if ( player_positions[player_id].size() > max_history_len ) {
-                    player_positions[player_id].erase( player_positions[player_id].begin() );
+                // Add player to history map.
+                if ( player_positions.count( player_id ) < 1 ) {
+                    history_pos hpos;
+                    //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
                 }
-            }
 
-            // Draw history.
-            for( auto const& pos : player_positions[ player_id ]) {
-                Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
-                rect.render( pos.state_got );
+                if ( player_positions.count( player_id )) {
+
+                    // Add new position to history
+                    //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
+
+                    // Delete oldest history pos.
+                    if ( player_positions[player_id].size() > max_history_len ) {
+                        player_positions[player_id].erase( player_positions[player_id].begin() );
+                    }
+                }
+
+                // Draw history.
+                for( auto const& pos : player_positions[ player_id ]) {
+                    Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
+                    rect.render( pos.state_got );
+                }
             }
         }
     }
