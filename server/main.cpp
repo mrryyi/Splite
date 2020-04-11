@@ -60,8 +60,6 @@ int main() {
 
     ClientMap clients;
 
-    Player::PlayerInput empty_player_input = Player::PlayerInput();
-
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
@@ -89,7 +87,10 @@ int main() {
             bytes_received = recvfrom( sock, (char*) r_Msg.buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if ( bytes_received != SOCKET_ERROR ) {
-                switch ( (Network::ClientMessageType) r_Msg.buffer[0] ){
+
+                uint8 message_type = r_Msg.buffer[0];
+                
+                switch ( message_type ){
                     case Network::ClientMessageType::RegisterRequest:
                     {
 
@@ -131,8 +132,10 @@ int main() {
                             clients[id]->last_asked = now;
                         }
                     }
+                    break;
                     case Network::ClientMessageType::Input:
                     {
+                        
                         uint32 id;
                         uint64 timestamp_ms;
                         Player::PlayerInput player_input;

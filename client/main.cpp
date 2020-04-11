@@ -149,6 +149,7 @@ int main() {
                 switch ( (Network::ServerMessageType) r_Msg.buffer[0] ) {
                     case Network::ServerMessageType::RegisterSyn:
                     {
+
                         printf("Handshaking...\n");
                         Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
                         Network::Message s_Msg;
@@ -183,6 +184,7 @@ int main() {
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
+                    break;
                     case Network::ServerMessageType::PlayerStates:
                     {
 
