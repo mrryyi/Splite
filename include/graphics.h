@@ -318,8 +318,8 @@ public:
                     printf("[i: %d]", i);
                     glm::mat4 model = glm::mat4(1.0f);
                     model = glm::translate(model, player_states[i]->position);
-                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
-                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
                     ourShader.setMat4f("model", model);
                     glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
