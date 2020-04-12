@@ -143,6 +143,8 @@ int main() {
                 Network::Message r_Msg;
                 r_Msg.address = from;
                 r_Msg.address_size = from_size;
+
+                printf("hello, bytes_received != socket error!\n");
                 
                 memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
 
@@ -228,12 +230,15 @@ int main() {
                     break;
                     default:
                     {
-
+                        printf("Invalid message received.\n");
                     }
                     break;
                 }
 
             } // End if received non-garbage
+            else {
+                printf("Socket error :(\n");
+            }
 
         } // End while timer not reached ms per tick
 
@@ -243,7 +248,7 @@ int main() {
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;
         printf("time heard from server ms: %d", time_since_heard_from_server_ms);
         
-        /*
+        
         if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
             printf("Not connected anymore.");
             connected = false;
@@ -252,7 +257,7 @@ int main() {
             player_states.push_back(&last_known_player_state);
             local_player_state_i = 0;
         }
-        */
+        
 
         printf("[Connected: { %d }]\n", connected);
 

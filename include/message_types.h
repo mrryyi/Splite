@@ -13,7 +13,7 @@ enum ClientMessageType : uint8 {
     Input
 };
 
-const char *CliMsgNames[] = {"NoMessage"
+const char *CliMsgNames[] = {"NoMessage",
                              "RegisterRequest", 
                              "RegisterAck",
                              "ConnectionResponse",

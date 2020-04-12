@@ -94,7 +94,7 @@ int main() {
                     case Network::ClientMessageType::RegisterRequest:
                     {
 
-                        printf("Register request.\n");
+                        printf("Register request -> Send register syn.\n");
                         uint32 id_for_client = ++lastID;
                         Network::Message s_Msg;
                         msg_size = Network::server_msg_syn_write( s_Msg.buffer, id_for_client );
@@ -104,16 +104,19 @@ int main() {
                     break;
                     case Network::ClientMessageType::RegisterAck:
                     {
+                        printf("Register ack: ");
 
                         uint8 yes_no = 0;
                         uint32 id;
                         Network::client_msg_ack_read( r_Msg.buffer, &id );
-                        printf("registerack");
 
                         if ( clients.size() < MAX_CLIENTS_CONNECTED && clients.count( id ) == 0 ) {
                             yes_no = 1;
                             clients[id] = new Client( id, r_Msg.address );
                             printf("New client registered.\n");
+                        }
+                        else {
+                            printf("Client denied.\n");
                         }
 
                         Network::Message s_Msg;
@@ -161,9 +164,15 @@ int main() {
                         }
                     }
                     default:
+                    {
+                        printf("Invalid message received.\n");
+                    }
                     break;
                 } // End switch
             } // End if bytes_received is not socket error
+            else {
+                printf("Socket error :(\n");
+            }
         } // End while tick not complete
 
         Timer_ms::timer_start();
