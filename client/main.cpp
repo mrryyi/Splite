@@ -183,6 +183,7 @@ int main() {
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
+                    break;
                     case Network::ServerMessageType::PlayerStates:
                     {
 

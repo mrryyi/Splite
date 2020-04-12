@@ -131,6 +131,7 @@ int main() {
                             clients[id]->last_asked = now;
                         }
                     }
+                    break;
                     case Network::ClientMessageType::Input:
                     {
                         uint32 id;
