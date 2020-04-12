@@ -170,9 +170,6 @@ int main() {
                     break;
                 } // End switch
             } // End if bytes_received is not socket error
-            else {
-                printf("Socket error :(\n");
-            }
         } // End while tick not complete
 
         Timer_ms::timer_start();

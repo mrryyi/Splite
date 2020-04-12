@@ -236,10 +236,6 @@ int main() {
                 }
 
             } // End if received non-garbage
-            else {
-                printf("Socket error :(\n");
-            }
-
         } // End while timer not reached ms per tick
 
         Timer_ms::timer_start();
