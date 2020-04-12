@@ -6,21 +6,22 @@ namespace Network
 {
 
 enum ClientMessageType : uint8 {
-    RegisterRequest = 0,
+    RegisterRequest = 1,
     RegisterAck,
     ConnectionResponse,
     Leave,
     Input
 };
 
-const char *CliMsgNames[] = {"RegisterRequest", 
+const char *CliMsgNames[] = {"NoMessage",
+                             "RegisterRequest", 
                              "RegisterAck",
                              "ConnectionResponse",
                              "Leave",
                              "Input"};
 
 enum ServerMessageType : uint8 {
-    RegisterSyn = 0,
+    RegisterSyn = 1,
     RegisterResult,
     ConnectionRequest,
     GameState,
@@ -28,7 +29,8 @@ enum ServerMessageType : uint8 {
     PlayerStates
 };
 
-const char *SrvMsgNames[] = {"RegisterSyn",
+const char *SrvMsgNames[] = {"NoMessage",
+                             "RegisterSyn",
                              "RegisterResult",
                              "ConnectionRequest",
                              "GameState",

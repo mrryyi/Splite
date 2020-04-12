@@ -1,125 +1,198 @@
 #pragma once
 
 #include <vector>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 namespace Player
 {
 
+void print_vec3f(const glm::vec3& vec3f) {
+    printf("x:%f, y:%f, z:%f\n", vec3f.x, vec3f.y, vec3f.z);
+};
+
 struct PlayerInput
 {
+    bool8 forward = 0;
+    bool8 backward = 0;
     bool8 up = 0;
     bool8 down = 0;
     bool8 left = 0;
     bool8 right = 0;
     bool8 jump = 0;
 
+    float32 yaw;
+    float32 pitch;
+
     void operator =(const PlayerInput &p) {
+        forward = p.forward;
+        backward = p.backward;
         up = p.up;
         down = p.down;
         left = p.left;
         right = p.right;
         jump = p.jump;
+
+        yaw = p.yaw;
+        pitch = p.pitch;
     };
 
     bool8 operator ==(const PlayerInput &p) {
-        return  (up == p.up)       && 
-                (down == p.down)   &&
-                (left == p.left)   &&
-                (right == p.right) &&
-                (jump == p.jump);
+        return  (forward == p.forward)   &&
+                (backward == p.backward) &&
+                (up == p.up)             && 
+                (down == p.down)         &&
+                (left == p.left)         &&
+                (right == p.right)       &&
+                (jump == p.jump)         &&
+                (yaw == p.yaw)           && 
+                (pitch == p.pitch);
     };
 
     bool8 operator !=(const PlayerInput &p) {
         return !(*this == p);
-    };
-
-    const static size_t sizeof_content() {
-        return sizeof( uint8 ) * 5;
     };
 };
 
 class PlayerState {
 public:
     uint32 id = NO_ID_GIVEN;
-    float64 x = 0.0;
-    float64 y = 0.0;
-    float32 speed_x = 0.0;
-    float32 speed_y = 0.0;
-    PlayerState(uint32 id, float64 x, float64 y, float32 speed_x, float32 speed_y) : id(id), x(x), y(y) {}
-    PlayerState() {}
+    glm::vec3 position;
+    glm::vec3 velocity;
+    float32 yaw = 0.0f;
+    float32 pitch = 0.0f;
+
+    PlayerState(uint32 id, glm::vec3 position, glm::vec3 velocity )
+    : id(id), position(position), velocity(velocity) {
+
+
+    }
+
+    PlayerState() {
+        position = glm::vec3(0.0, 0.0, 0.0);
+        velocity = glm::vec3(0.0, 0.0, 0.0);
+    }
 
     void operator =(const PlayerState &p) {
         id = p.id;
-        x = p.x;
-        y = p.x;
-        speed_x = p.speed_x;
-        speed_y = p.speed_y;
-    };
-
-    const static size_t sizeof_content() {
-        return sizeof( int32 ) + sizeof( float64 ) + sizeof( float64 ) + sizeof( float32 ) + sizeof( float32 );
+        position = p.position;
+        velocity = p.velocity;
+        yaw = p.yaw;
+        pitch = p.pitch;
     };
 };
 
 // Per millisecond
-constexpr float32 player_movement_speed_pms = 0.5;
-constexpr float32 player_jump_speed_pms = 2.0;
-constexpr float32 gravity_pms = 0.01;
+constexpr float32 player_movement_speed_pms = 0.05;
+constexpr float32 player_jump_speed_pms = 0.05;
+constexpr float32 gravity_pms = 0.003;
 
 
 void tick_player_by_physics( PlayerState &player_state, float32 delta_time_ms ) {
 
-    player_state.speed_y -= gravity_pms * delta_time_ms;
-    
-    player_state.x += player_state.speed_x * delta_time_ms;
-    player_state.y += player_state.speed_y * delta_time_ms;
+    glm::vec3 gravity = glm::vec3( 0.0f, -gravity_pms, 0.0f);
+    player_state.velocity += ( gravity );
 
-    if (player_state.y < 0.0) {
-        player_state.y = 0.0;
+    player_state.position += player_state.velocity * delta_time_ms;
+
+    if (player_state.position.y < 0.0) {
+        player_state.position.y = 0.0;
     }
 };
 
 void tick_player_by_input( PlayerState &player_state, PlayerInput &player_input, float32 delta_time_ms ) {
 
-    int8 desired_x_direction = 0;
+    glm::vec3 front;
+    front.x = cos(glm::radians(player_state.yaw)) * cos(glm::radians(player_state.pitch));
+    front.y = 0.0f; //sin(glm::radians(player_state.pitch));
+    front.z = sin(glm::radians(player_state.yaw)) * cos(glm::radians(player_state.pitch));
+    front = glm::normalize(front);
+    // Also re-calculate the Right and Up vector
 
+    glm::vec3 WorldUp = glm::vec3( 0.0, 1.0, 0.0 );
+    glm::vec3 right = glm::normalize(glm::cross(front, WorldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+
+    glm::vec3 desired_movement_direction = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    if ( player_input.forward ) {
+        desired_movement_direction += front;
+    }
+    if ( player_input.backward ) {
+        desired_movement_direction -= front;
+    }
     if ( player_input.left ) {
-        desired_x_direction -= 1;
+        desired_movement_direction -= right;
     }
-
     if ( player_input.right ) {
-        desired_x_direction += 1;
+        desired_movement_direction += right;
     }
 
-    bool8 grounded = player_state.y == 0.0;
+    bool8 jumping = false;
 
-    // Players can only change their x-direction, or jump, if they're grounded.
-    if ( grounded ) {
-        
-        player_state.speed_x = desired_x_direction * player_movement_speed_pms;
-        if ( player_input.jump ) {
-            player_state.speed_y = player_jump_speed_pms;
+    if( player_input.jump) {
+        jumping = true;
+    }
+
+    bool8 direction;
+
+    if (glm::length(desired_movement_direction) == 0.0) {
+        direction = false;
+    }
+    else {
+        desired_movement_direction = glm::normalize(desired_movement_direction);
+        direction = true;
+    }
+
+    glm::vec3 velocity;
+
+    bool is_grounded = player_state.position.y == 0.0f;
+
+    if ( is_grounded ) {
+        if ( direction ) {
+            velocity = desired_movement_direction * player_movement_speed_pms;
+        }
+        else {
+            velocity = {0.0, 0.0, 0.0};
+        }
+
+        if ( jumping ) {
+            glm::vec3 jumping_velocity = glm::vec3( 0.0f, player_jump_speed_pms, 0.0f);
+            velocity += jumping_velocity;
         }
     }
+
+    if ( !is_grounded ) {
+
+        velocity = player_state.velocity;
+
+    }
+
+    player_state.velocity = velocity;
+
+    player_state.yaw = player_input.yaw;
+    player_state.pitch = player_input.pitch;
 
     tick_player_by_physics( player_state, delta_time_ms );
 
 };
 
+void print_player_input(const PlayerInput& pi) {
+    printf("[w:%d s:%d a:%d d:%d]\n", pi.forward, pi.backward, pi.left, pi.right );
+};
 
 void print_player_state(const PlayerState& ps) {
-    printf("[id: %d, x:%f, y:%f]\n", ps.id, ps.x, ps.y);
+    printf("[id: %d, x:%f, y:%f, z:%f]\n", ps.id, ps.position.x, ps.position.y, ps.position.z);
 };
 
 void print_player_states(std::vector<PlayerState> player_states) {
     for(int i = 0; i < player_states.size(); i++) {
-        printf("[id: %d, x:%f, y:%f]\n", player_states[i].id, player_states[i].x, player_states[i].y);
+        print_player_state( player_states[i] );
     }
 };
 
 void print_player_states(std::vector<PlayerState*> player_states) {
     for(int i = 0; i < player_states.size(); i++) {
-        printf("[id: %d, x:%f, y:%f]\n", player_states[i]->id, player_states[i]->x, player_states[i]->y);
+        print_player_state( *player_states[i] );
     }
 };
 

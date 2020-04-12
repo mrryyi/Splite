@@ -2,7 +2,8 @@
 #include "..\include\network_messages.h"
 #include "..\include\network.h"
 #include "..\include\timer.h"
-
+#include <glad/glad.h>
+#include "..\include\input.h"
 #include "..\include\graphics.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -24,8 +25,19 @@ int main() {
 
     fr = graphics::create_window(graphics_handle);
     if (fr) {
+        printf("WHAT THE FACK WE FAILED CREATING A WINDOW.\n");
         exit(EXIT_FAILURE);
     }
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+       printf("Failed to initialize GLAD");
+        return -1;
+    }
+
+    glViewport(0, 0, window_coord_width, window_coord_height);
+
+    graphics_handle.init();
     
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
@@ -103,13 +115,13 @@ int main() {
 
     std::vector<Player::PlayerState*> player_states;
 
-    Player::PlayerState last_known_player_state(NO_ID_GIVEN, 0.0, 0.0, 0.0, 0.0);
+    Player::PlayerState last_known_player_state( NO_ID_GIVEN, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) );
     player_states.push_back(&last_known_player_state);
     uint32 local_player_state_i;
     bool8 connected = false;
     uint32 id_from_server = NO_ID_GIVEN;
 
-    uint64 last_heard_from_server_ms = 0;
+    uint64 last_heard_from_server_ms = timeSinceEpochMillisec();
     uint64 time_since_heard_from_server_ms = 0;
 
     uint32 msg_size;
@@ -118,7 +130,7 @@ int main() {
     
     printf("Running.\nAttempting to connect...\n");
 
-    while( running ) {
+    while( !glfwWindowShouldClose( graphics_handle.window )) {
         
         bool8 state_got_this_tick = false;
 
@@ -137,11 +149,16 @@ int main() {
                 switch ( (Network::ServerMessageType) r_Msg.buffer[0] ) {
                     case Network::ServerMessageType::RegisterSyn:
                     {
-                        printf("Handshaking...\n");
-                        Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
-                        Network::Message s_Msg;
-                        msg_size = Network::client_msg_ack_write( s_Msg.buffer, id_from_server );
-                        Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
+                        
+                        //if ( id_from_server == NO_ID_GIVEN ) {
+                            printf("Handshaking...\n");
+                            Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
+                            Network::Message s_Msg;
+                            msg_size = Network::client_msg_ack_write( s_Msg.buffer, id_from_server );
+                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
+                        //else {
+                        //    printf("Server tried to register syn, but ID is present.");
+                        //}
 
                     }
                     break;
@@ -150,16 +167,21 @@ int main() {
                         
                         uint8 ye_nah;
                         Network::server_msg_register_result_read( r_Msg.buffer, &ye_nah );
-
-                        if ( ye_nah ) {
-                            printf("Connected...\n");
-                            connected = true;
-                        }
-                        else {
-                            printf("Rejected :/\n");
-                            id_from_server = NO_ID_GIVEN;
-                            connected = false;
-                        }
+                        
+                        //if ( (id_from_server == NO_ID_GIVEN) && !connected ) {
+                            if ( ye_nah ) {
+                                printf("Connected...\n");
+                                connected = true;
+                            }
+                            else {
+                                printf("Rejected :/\n");
+                                id_from_server = NO_ID_GIVEN;
+                                connected = false;
+                            }
+                        //}
+                        //else {
+                        //    printf("Server tried to register result, but ID is present.");
+                        //}
 
                     }
                     break;
@@ -171,6 +193,7 @@ int main() {
                         Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
+                    break;
                     case Network::ServerMessageType::PlayerStates:
                     {
 
@@ -191,21 +214,34 @@ int main() {
                     
                     }
                     break;
-                    default:
+                    case Network::ServerMessageType::Kicked:
                     {
 
+                        printf("Kicked");
+                        connected = false;
+                        id_from_server = NO_ID_GIVEN;
+                        player_states.clear();
+                        player_states.push_back(&last_known_player_state);
+                        local_player_state_i = 0;
+
+                    }
+                    break;
+                    default:
+                    {
+                        printf("Invalid message received.\n");
                     }
                     break;
                 }
 
             } // End if received non-garbage
-
         } // End while timer not reached ms per tick
 
         Timer_ms::timer_start();
 
         now = timeSinceEpochMillisec();
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;
+        printf("time heard from server ms: %d", time_since_heard_from_server_ms);
+        
         
         if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
             printf("Not connected anymore.");
@@ -215,12 +251,16 @@ int main() {
             player_states.push_back(&last_known_player_state);
             local_player_state_i = 0;
         }
+        
+
+        printf("[Connected: { %d }]\n", connected);
 
         if ( connected != true ) {
             now = timeSinceEpochMillisec();
 
             int32 time_since = now - last_ask;
             if ( time_since > interval_ms ) {
+                printf("Not connected: requesting server to register.\n");
                 Network::Message s_Msg;
                 msg_size = Network::client_msg_register_write( s_Msg.buffer );
                 Network::send_msg( &sock, s_Msg, msg_size, server_address );
@@ -229,13 +269,9 @@ int main() {
         }
 
         Player::PlayerInput old_input = input;
-        
-        // Get input
-        input.up = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_W ) == GLFW_PRESS) ? 1 : 0; 
-        input.down = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_S ) == GLFW_PRESS) ? 1 : 0;
-        input.left = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_A ) == GLFW_PRESS) ? 1 : 0;
-        input.right = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_D ) == GLFW_PRESS) ? 1 : 0;
-        input.jump = (uint8) (glfwGetKey( graphics_handle.window, GLFW_KEY_SPACE ) == GLFW_PRESS) ? 1 : 0;
+
+        // Now we have pitch and yaw into our input.
+        process_input( graphics_handle, input );
         
         if ( connected && id_from_server != NO_ID_GIVEN ) {
 
@@ -252,14 +288,15 @@ int main() {
 
             if ( i == local_player_state_i ) {
                 Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
+
+                graphics_handle.camera.SetCamera( player_states[i]->position, player_states[i]->yaw, player_states[i]->pitch );
+                Player::print_player_state( *player_states[i] );
             }
             else {
                 Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
             }
 
         }
-
-
         // Update graphics
         // Should take in a gamestate object.
         now = timeSinceEpochMillisec();
@@ -272,7 +309,7 @@ int main() {
 
         uint64 delta_frame_time = now - last_frame_ms;
         if ( delta_frame_time >= milliseconds_per_frame ) {
-            graphics_handle.Update( player_states, state_got_this_tick, milliseconds_per_frame );
+            graphics_handle.Update( player_states, local_player_state_i, state_got_this_tick, milliseconds_per_frame );
             last_frame_ms = now;
         }
 

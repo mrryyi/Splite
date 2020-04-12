@@ -1,17 +1,21 @@
 #pragma once
 #include "pre.h"
 #include "game.h"
-// Our fancy schmancy graphics handler
+
+// Graphics
+#include "shader.h"
+#include "graphicsfunc.h"
+#include "stb_image.h"
 #include <GLFW/glfw3.h>
-#include <cmath>
-#include <fstream>
-#include <strstream>
-#include <algorithm>
-#include <list>
+#include "camera.h"
+
+// GL math
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 namespace graphics
 {
-
 
 class Rect {
 public:
@@ -35,20 +39,6 @@ public:
     };
 
     void render( bool8 state_got ) {
-        glBegin(GL_POLYGON);
-
-        if ( state_got ) {
-            glColor3f(1.0, 0.0, 0.0);
-        }
-        else {
-            glColor3f(1.0, 1.0, 1.0);
-        }
-
-        glVertex3f(x_start, y_start, 0.0);
-        glVertex3f(x_end, y_start, 0.0);
-        glVertex3f(x_end, y_end, 0.0);
-        glVertex3f(x_start, y_end, 0.0);
-        glEnd();
     };
     
 };
@@ -71,92 +61,8 @@ public:
 };
 
 
-
-
-
-
-
-struct vec3d {
-    float32 x = 0.0;
-    float32 y = 0.0;
-    float32 z = 0.0;
-    float32 w = 1.0;
-};
-
-struct color3f {
-    GLfloat r = { 1.0 }, g = { 1.0 }, b = { 1.0 };
-
-    void operator=(const color3f& param) {
-        r = param.r;
-        g = param.g;
-        b = param.b;
-    }
-};
-
-struct triangle {
-    vec3d p[3];
-
-    color3f color;
-
-
-};
-
-struct mesh {
-    std::vector<triangle> tris;
-
-    bool8 load_from_object_file( std::string filename ) {
-        
-        std::ifstream f(filename);
-        if (!f.is_open())
-            return false;
-        
-        std::vector<vec3d> verts;
-        char junk;
-
-        while (!f.eof())
-		{
-			char line[128];
-			f.getline(line, 128);
-
-			std::strstream s;
-			s << line;
-
-			char junk;
-
-			if (line[0] == 'v')
-			{
-				vec3d v;
-				s >> junk >> v.x >> v.y >> v.z;
-				verts.push_back(v);
-			}
-
-			if (line[0] == 'f')
-			{
-				int f[3];
-				s >> junk >> f[0] >> f[1] >> f[2];
-				tris.push_back({ verts[f[0] - 1], verts[f[1] - 1], verts[f[2] - 1] });
-			}
-		}
-
-        return true;
-    }
-};
-
-struct mat4x4 {
-    float32 m[4][4] = { 0 };
-};
-
-
-
-
-
-
-
-
-
-
 class GraphicsHandle {
-private:
+public:
     mesh meshCube;
     mat4x4 matProj;
 
@@ -169,275 +75,6 @@ private:
     float32 fYaw = 0.0;
 
     float32 fTheta = 0.0;
-
-    vec3d matrix_multiply_vector( mat4x4 &m, vec3d &i) {
-        vec3d v;
-        v.x = i.x * m.m[0][0] + i.y * m.m[1][0] + i.z * m.m[2][0] + i.w * m.m[3][0];
-		v.y = i.x * m.m[0][1] + i.y * m.m[1][1] + i.z * m.m[2][1] + i.w * m.m[3][1];
-		v.z = i.x * m.m[0][2] + i.y * m.m[1][2] + i.z * m.m[2][2] + i.w * m.m[3][2];
-		v.w = i.x * m.m[0][3] + i.y * m.m[1][3] + i.z * m.m[2][3] + i.w * m.m[3][3];
-        return v;
-    }
-
-    mat4x4 matrix_make_identity() {
-        mat4x4 matrix;
-        matrix.m[0][0] = 1.0f;
-        matrix.m[1][1] = 1.0f;
-        matrix.m[2][2] = 1.0f;
-        matrix.m[3][3] = 1.0f;
-        return matrix;
-    }
-
-    mat4x4 matrix_make_rotation_x( float32 fAngleRad ) {
-        mat4x4 matrix;
-        matrix.m[0][0] = 1;
-        matrix.m[1][1] = cosf(fAngleRad * 0.5f);
-        matrix.m[1][2] = sinf(fAngleRad * 0.5f);
-        matrix.m[2][1] = -sinf(fAngleRad * 0.5f);
-        matrix.m[2][2] = cosf(fAngleRad * 0.5f);
-        matrix.m[3][3] = 1;
-        return matrix;
-    }
-
-    mat4x4 matrix_make_rotation_y( float32 fAngleRad )
-	{
-		mat4x4 matrix;
-		matrix.m[0][0] = cosf(fAngleRad);
-		matrix.m[0][2] = sinf(fAngleRad);
-		matrix.m[2][0] = -sinf(fAngleRad);
-		matrix.m[1][1] = 1.0f;
-		matrix.m[2][2] = cosf(fAngleRad);
-		matrix.m[3][3] = 1.0f;
-		return matrix;
-	}
-
-    mat4x4 matrix_make_rotation_z( float32 fAngleRad ) {
-        mat4x4 matrix;
-        matrix.m[0][0] = cosf(fAngleRad);
-        matrix.m[0][1] = sinf(fAngleRad);
-        matrix.m[1][0] = -sinf(fAngleRad);
-        matrix.m[1][1] = cosf(fAngleRad);
-        matrix.m[2][2] = 1;
-        matrix.m[3][3] = 1;
-        return matrix;
-    }
-
-    mat4x4 matrix_make_translation( float32 x, float32 y, float32 z) {
-        mat4x4 matrix;
-		matrix.m[0][0] = 1.0f;
-		matrix.m[1][1] = 1.0f;
-		matrix.m[2][2] = 1.0f;
-		matrix.m[3][3] = 1.0f;
-		matrix.m[3][0] = x;
-		matrix.m[3][1] = y;
-		matrix.m[3][2] = z;
-		return matrix;
-    }
-
-    mat4x4 matrix_make_projection(float fFovDegrees, float fAspectRatio, float fNear, float fFar)
-	{
-		float fFovRad = 1.0f / tanf(fFovDegrees * 0.5f / 180.0f * 3.14159f);
-		mat4x4 matrix;
-		matrix.m[0][0] = fAspectRatio * fFovRad;
-		matrix.m[1][1] = fFovRad;
-		matrix.m[2][2] = fFar / (fFar - fNear);
-		matrix.m[3][2] = (-fFar * fNear) / (fFar - fNear);
-		matrix.m[2][3] = 1.0f;
-		matrix.m[3][3] = 0.0f;
-		return matrix;
-	}
-
-    mat4x4 matrix_multiply_matrix(mat4x4 &m1, mat4x4 &m2)
-	{
-		mat4x4 matrix;
-		for (int c = 0; c < 4; c++)
-			for (int r = 0; r < 4; r++)
-				matrix.m[r][c] = m1.m[r][0] * m2.m[0][c] + m1.m[r][1] * m2.m[1][c] + m1.m[r][2] * m2.m[2][c] + m1.m[r][3] * m2.m[3][c];
-		return matrix;
-	}
-    
-    mat4x4 matrix_point_at(vec3d &pos, vec3d &target, vec3d &up) {
-        // Calculate new forward direction
-        vec3d newForward = vector_sub(target, pos);
-		newForward = vector_normalize(newForward);
-
-		// Calculate new Up direction
-		vec3d a = vector_mul(newForward, vector_dot_product(up, newForward));
-		vec3d newUp = vector_sub(up, a);
-		newUp = vector_normalize(newUp);
-
-		// New Right direction is easy, its just cross product
-		vec3d newRight = vector_cross_product(newUp, newForward);
-
-		// Construct Dimensioning and Translation Matrix	
-		mat4x4 matrix;
-		matrix.m[0][0] = newRight.x;	matrix.m[0][1] = newRight.y;	matrix.m[0][2] = newRight.z;	matrix.m[0][3] = 0.0f;
-		matrix.m[1][0] = newUp.x;		matrix.m[1][1] = newUp.y;		matrix.m[1][2] = newUp.z;		matrix.m[1][3] = 0.0f;
-		matrix.m[2][0] = newForward.x;	matrix.m[2][1] = newForward.y;	matrix.m[2][2] = newForward.z;	matrix.m[2][3] = 0.0f;
-		matrix.m[3][0] = pos.x;			matrix.m[3][1] = pos.y;			matrix.m[3][2] = pos.z;			matrix.m[3][3] = 1.0f;
-		return matrix;
-    }
-
-    mat4x4 matrix_quick_inverse(mat4x4 &m) // Only for Rotation/Translation Matrices
-	{
-		mat4x4 matrix;
-		matrix.m[0][0] = m.m[0][0]; matrix.m[0][1] = m.m[1][0]; matrix.m[0][2] = m.m[2][0]; matrix.m[0][3] = 0.0f;
-		matrix.m[1][0] = m.m[0][1]; matrix.m[1][1] = m.m[1][1]; matrix.m[1][2] = m.m[2][1]; matrix.m[1][3] = 0.0f;
-		matrix.m[2][0] = m.m[0][2]; matrix.m[2][1] = m.m[1][2]; matrix.m[2][2] = m.m[2][2]; matrix.m[2][3] = 0.0f;
-		matrix.m[3][0] = -(m.m[3][0] * matrix.m[0][0] + m.m[3][1] * matrix.m[1][0] + m.m[3][2] * matrix.m[2][0]);
-		matrix.m[3][1] = -(m.m[3][0] * matrix.m[0][1] + m.m[3][1] * matrix.m[1][1] + m.m[3][2] * matrix.m[2][1]);
-		matrix.m[3][2] = -(m.m[3][0] * matrix.m[0][2] + m.m[3][1] * matrix.m[1][2] + m.m[3][2] * matrix.m[2][2]);
-		matrix.m[3][3] = 1.0f;
-		return matrix;
-	}
-
-
-    vec3d vector_add( vec3d &v1, vec3d &v2) {
-        return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
-    }
-
-    vec3d vector_sub( vec3d &v1, vec3d &v2) {
-        return { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z};
-    }
-
-    vec3d vector_mul( vec3d &v, float32 k) {
-        return { v.x * k, v.y * k, v.z * k };
-    }
-
-    vec3d vector_div( vec3d &v, float32 k) {
-        return { v.x / k, v.y / k, v.z / k };
-    }
-
-    float32 vector_dot_product( vec3d &v1, vec3d &v2 ) {
-        return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-    }
-
-    float32 vector_length( vec3d &v ) {
-        return sqrtf( vector_dot_product( v, v ));
-    }
-
-    vec3d vector_normalize( vec3d &v ) {
-        float32 l = vector_length( v );
-        return { v.x / l, v.y / l, v.z / l };
-    }
-
-    vec3d vector_cross_product( vec3d &v1, vec3d &v2 ) {
-        vec3d v;
-        v.x = v1.y * v2.z - v1.z * v2.y;
-		v.y = v1.z * v2.x - v1.x * v2.z;
-		v.z = v1.x * v2.y - v1.y * v2.x;
-        return v;
-    }
-
-    vec3d vector_intersect_plane(vec3d &plane_p, vec3d &plane_n, vec3d &lineStart, vec3d &lineEnd)
-	{
-		plane_n = vector_normalize(plane_n);
-		float plane_d = -vector_dot_product(plane_n, plane_p);
-		float ad = vector_dot_product(lineStart, plane_n);
-		float bd = vector_dot_product(lineEnd, plane_n);
-		float t = (-plane_d - ad) / (bd - ad);
-		vec3d lineStartToEnd = vector_sub(lineEnd, lineStart);
-		vec3d lineToIntersect = vector_mul(lineStartToEnd, t);
-		return vector_add(lineStart, lineToIntersect);
-	}
-
-    int Triangle_ClipAgainstPlane(vec3d plane_p, vec3d plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2)
-	{
-		// Make sure plane normal is indeed normal
-		plane_n = vector_normalize(plane_n);
-
-		// Return signed shortest distance from point to plane, plane normal must be normalised
-		auto dist = [&](vec3d &p)
-		{
-			vec3d n = vector_normalize(p);
-			return (plane_n.x * p.x + plane_n.y * p.y + plane_n.z * p.z - vector_dot_product(plane_n, plane_p));
-		};
-
-		// Create two temporary storage arrays to classify points either side of plane
-		// If distance sign is positive, point lies on "inside" of plane
-		vec3d* inside_points[3];  int nInsidePointCount = 0;
-		vec3d* outside_points[3]; int nOutsidePointCount = 0;
-
-		// Get signed distance of each point in triangle to plane
-		float d0 = dist(in_tri.p[0]);
-		float d1 = dist(in_tri.p[1]);
-		float d2 = dist(in_tri.p[2]);
-
-		if (d0 >= 0) { inside_points[nInsidePointCount++] = &in_tri.p[0]; }
-		else { outside_points[nOutsidePointCount++] = &in_tri.p[0]; }
-		if (d1 >= 0) { inside_points[nInsidePointCount++] = &in_tri.p[1]; }
-		else { outside_points[nOutsidePointCount++] = &in_tri.p[1]; }
-		if (d2 >= 0) { inside_points[nInsidePointCount++] = &in_tri.p[2]; }
-		else { outside_points[nOutsidePointCount++] = &in_tri.p[2]; }
-
-		// Now classify triangle points, and break the input triangle into 
-		// smaller output triangles if required. There are four possible
-		// outcomes...
-
-		if (nInsidePointCount == 0)
-		{
-			// All points lie on the outside of plane, so clip whole triangle
-			// It ceases to exist
-
-			return 0; // No returned triangles are valid
-		}
-
-		if (nInsidePointCount == 3)
-		{
-			// All points lie on the inside of plane, so do nothing
-			// and allow the triangle to simply pass through
-			out_tri1 = in_tri;
-
-			return 1; // Just the one returned original triangle is valid
-		}
-
-		if (nInsidePointCount == 1 && nOutsidePointCount == 2)
-		{
-			// Triangle should be clipped. As two points lie outside
-			// the plane, the triangle simply becomes a smaller triangle
-
-			// Copy appearance info to new triangle
-			out_tri1.color =  in_tri.color;
-
-			// The inside point is valid, so keep that...
-			out_tri1.p[0] = *inside_points[0];
-
-			// but the two new points are at the locations where the 
-			// original sides of the triangle (lines) intersect with the plane
-			out_tri1.p[1] = vector_intersect_plane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
-			out_tri1.p[2] = vector_intersect_plane(plane_p, plane_n, *inside_points[0], *outside_points[1]);
-
-			return 1; // Return the newly formed single triangle
-		}
-
-		if (nInsidePointCount == 2 && nOutsidePointCount == 1)
-		{
-			// Triangle should be clipped. As two points lie inside the plane,
-			// the clipped triangle becomes a "quad". Fortunately, we can
-			// represent a quad with two new triangles
-
-			// Copy appearance info to new triangles
-			out_tri1.color =  in_tri.color;
-
-			out_tri2.color =  in_tri.color;
-
-			// The first triangle consists of the two inside points and a new
-			// point determined by the location where one side of the triangle
-			// intersects with the plane
-			out_tri1.p[0] = *inside_points[0];
-			out_tri1.p[1] = *inside_points[1];
-			out_tri1.p[2] = vector_intersect_plane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
-
-			// The second triangle is composed of one of he inside points, a
-			// new point determined by the intersection of the other side of the 
-			// triangle and the plane, and the newly created point above
-			out_tri2.p[0] = *inside_points[1];
-			out_tri2.p[1] = out_tri1.p[2];
-			out_tri2.p[2] = vector_intersect_plane(plane_p, plane_n, *inside_points[1], *outside_points[0]);
-
-			return 2; // Return two newly formed triangles which form a quad
-		}
-	}
 
     void calcMatProj() {
         float32 fNear = 0.1f;
@@ -455,38 +92,9 @@ private:
         matProj.m[3][3] = 0.0;
     }
 
-    void draw_line( float32 x1, float32 y1 , float x2, float32 y2){
-        glBegin(GL_LINES);
-        glColor3f(0.0, 0.0, 0.0);
-        glVertex2f(x1, y1);
-        glVertex2f(x2, y2);
-        glEnd();
-    }
-
-    void draw_triangle ( const triangle& tri ) {
-        draw_line( tri.p[0].x, tri.p[0].y, tri.p[1].x, tri.p[1].y );
-        draw_line( tri.p[1].x, tri.p[1].y, tri.p[2].x, tri.p[2].y );
-        draw_line( tri.p[2].x, tri.p[2].y, tri.p[0].x, tri.p[0].y );
-    }
-
-    void draw_triangle_filled ( const triangle& tri ) {
-        glBegin(GL_POLYGON);
-        glColor3f(tri.color.r, tri.color.g, tri.color.b);
-        glVertex3f(tri.p[0].x, tri.p[0].y, 0.0);
-        glVertex3f(tri.p[1].x, tri.p[1].y, 0.0);
-        glVertex3f(tri.p[2].x, tri.p[2].y, 0.0);
-        glEnd();
-    }
-
-    void get_color_by_lum(float32 lum, color3f& out_color ) {
-        out_color.r = lum;
-        out_color.g = lum;
-        out_color.b = lum;
-    }
-
-    
-
-public:
+    float32 last_mouse_x = window_coord_width / 2.0f;
+    float32 last_mouse_y = window_coord_height / 2.0f;
+    bool firstMouse = true;
 
     const float DEG2RAD = 3.14159 / 180;
     float radius = 0.25;
@@ -494,248 +102,250 @@ public:
     float32 sc = 1.0;
     GLFWwindow* window;
 
+    unsigned int vertexShader;
+    unsigned int fragmentShader_1;
+    unsigned int fragmentShader_2;
+    unsigned int shaderProgram_1;
+    unsigned int shaderProgram_2;
+
+    Shader ourShader;
+
+    Camera camera;
+    
+    unsigned int texture1;
+    unsigned int texture2;
+
+    unsigned int VBOs[2];
+    unsigned int VAOs[2];
+    unsigned int EBOs[2];
+
+    // world space positions of our cubes
+    std::vector<glm::vec3> cubePositions;
+
+    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
+    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+    glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+
     GraphicsHandle() {
         
-        meshCube.load_from_object_file("../obj/teapot_minusz.obj");
+        //meshCube.load_from_object_file("../obj/teapot_minusz.obj");
         
     }
 
+    ~GraphicsHandle() {
+        glDeleteVertexArrays(2, VAOs);
+        glDeleteBuffers(2, VBOs);
+        glDeleteBuffers(2, EBOs);
+    }
 
+    void init() {
 
-    
-    // Updates graphics.
-    FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
+        camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         
-        int8 x_cam_dir = glfwGetKey( window, GLFW_KEY_RIGHT );
-        x_cam_dir -= glfwGetKey( window, GLFW_KEY_LEFT );
-        int8 y_cam_dir = glfwGetKey( window, GLFW_KEY_UP );
-        y_cam_dir -= glfwGetKey( window, GLFW_KEY_DOWN );
+        // Should enable blending of two textures.
+        // HASN'T WORKED SO FAR FOR SOME REASON BUT I DON'T
+        // CARE. WHO NEEDS BLENDED TEXTURES ANYWAY.
+        // IN FACT, WHO NEEDS ANY TEXTURES?
+        // LET'S JUST GET INSPIRED FROM SUPERHOT AND ONLY
+        // USE COLORS BUT IT STILL LOOKS SUPERCOOL (GET IT?)
+        // FOR SOME REASON
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        vec3d vForward = vector_mul(vLookDir, 0.05f * delta_time);
+        ourShader = Shader("../shaders/3.3.shader.vert", "../shaders/3.3.shader.frag");
 
-        if ( glfwGetKey( window, GLFW_KEY_W )) {
-            vCamera = vector_add( vCamera, vForward );
+        int  success;
+        char infoLog[512];
+
+        glEnable(GL_DEPTH_TEST);  
+
+
+        // set up vertex data (and buffer(s)) and configure vertex attributes
+        // ------------------------------------------------------------------
+        float vertices[] = {
+        // vertice coords  // color coords 
+        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+        };
+        
+        cubePositions.push_back( glm::vec3( 0.0f,  0.0f,  0.0f) );
+        cubePositions.push_back( glm::vec3( 2.0f,  5.0f, -15.0f) );
+        cubePositions.push_back( glm::vec3(-1.5f, -2.2f, -2.5f) );
+        cubePositions.push_back( glm::vec3(-3.8f, -2.0f, -12.3f) );
+        cubePositions.push_back( glm::vec3( 2.4f, -0.4f, -3.5f) );
+        cubePositions.push_back( glm::vec3(-1.7f,  3.0f, -7.5f) );
+        cubePositions.push_back( glm::vec3( 1.3f, -2.0f, -2.5f) );
+        cubePositions.push_back( glm::vec3( 1.5f,  2.0f, -2.5f) );
+        cubePositions.push_back( glm::vec3( 1.5f,  0.2f, -1.5f) );
+        cubePositions.push_back( glm::vec3(-1.3f,  1.0f, -1.5f) );
+
+        glGenBuffers( 2, VBOs );
+        glGenVertexArrays( 2, VAOs );
+        glGenBuffers(2, EBOs);
+
+        // Setup for this triangle.
+        glBindVertexArray( VAOs[0] );
+        
+        glBindBuffer( GL_ARRAY_BUFFER, VBOs[0] );
+        glBufferData( GL_ARRAY_BUFFER, sizeof( vertices ), vertices, GL_STATIC_DRAW );
+
+        // position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        // texture coord attribute
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        // texture 1
+        // ---------
+        glGenTextures(1, &texture1);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        // set the texture wrapping parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // set texture filtering parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // load image, create texture and generate mipmaps
+        int width, height, nrChannels;
+        stbi_set_flip_vertically_on_load(true); // tell stb_image.h to flip loaded texture's on the y-axis.
+        unsigned char *data = stbi_load("../textures/container.jpg", &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
         }
-        else if ( glfwGetKey( window, GLFW_KEY_S ) ) {
-            vCamera = vector_sub( vCamera, vForward );
+        else
+        {
+            std::cout << "Failed to load texture" << std::endl;
         }
+        stbi_image_free(data);
 
+        // tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
+        // -------------------------------------------------------------------------------------------
+        ourShader.use();
+        ourShader.setInt("texture1", 0);
+    }
 
-        int8 yaw_dir = -1 * glfwGetKey( window, GLFW_KEY_D );
-        yaw_dir += glfwGetKey( window, GLFW_KEY_A );
-
-        fYaw += 0.001f * yaw_dir * delta_time;
-
-        vCamera.x += 0.1f * x_cam_dir * delta_time;
-        vCamera.y += 0.1f * y_cam_dir * delta_time;
+    // Updates graphics.
+    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_i, bool8 state_got, float32 delta_time ) {
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
         }
         else {
-            //Setup View
-            float ratio;
-            int32 width, height;
-            int viewport_x = 0;
-            int viewport_y = 0;
 
-            glfwGetFramebufferSize(window, &width, &height);
-
-            if (height != framebuffer_height || width != framebuffer_width) {
-                printf("Size changed.\n");
-                framebuffer_height = height;
-                framebuffer_width = width;
-                matProj = matrix_make_projection(90.0, (float32) framebuffer_height / (float32) framebuffer_width, 0.1f, 1000.0f);
-            }
-
-            // Viewport is, basically, as if we're "moving" where the result
-            // of our next thing is. Imagine mapping the result to wherever we're
-            // "looking".
-            glViewport(viewport_x, viewport_y, width, height);
-            glClear(GL_COLOR_BUFFER_BIT);
+            // state-setting function
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            // state-using function
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
-            glColor3f(1.0, 1.0, 1.0);
+            ourShader.use();
 
-            // Set up rotation matrices
-            mat4x4 matRotZ, matRotX;
-            //fTheta += 0.001f * delta_time;
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE, texture1);
 
-            matRotX = matrix_make_rotation_x( fTheta );
-            matRotZ = matrix_make_rotation_z( fTheta );
-
-            mat4x4 matTrans;
-            matTrans = matrix_make_translation(0.0f, 0.0f, 5.0f);
-
-            mat4x4 matWorld;
-            matWorld = matrix_make_identity();
-            matWorld = matrix_multiply_matrix( matRotZ, matRotX );
-            matWorld = matrix_multiply_matrix( matWorld, matTrans );
-
-            vec3d vUp = {0, 1, 0};
-
-            vec3d vTarget = {0, 0, 1};
-            mat4x4 matCameraRot = matrix_make_rotation_y( fYaw );
-            // Unit vector to where we are looking.
-            vLookDir = matrix_multiply_vector( matCameraRot, vTarget );
-            vTarget = vector_add( vCamera, vLookDir );
-
-            mat4x4 matCamera = matrix_point_at( vCamera, vTarget, vUp );
-            mat4x4 matView = matrix_quick_inverse( matCamera );
-
-            std::vector<triangle> vecTrianglesToRaster;
+            // create transformations
+            glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+            glm::mat4 projection    = glm::mat4(1.0f);
+            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
             
-            for( auto tri : meshCube.tris ) {
+            view = camera.GetViewMatrix();
+            // pass transformation matrices to the shader
+            ourShader.setMat4f("projection", projection); // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
+            ourShader.setMat4f("view", view);
 
-                triangle triProjected, triTransformed, triViewed;
+            glBindVertexArray(VAOs[0]);
 
-                triTransformed.p[0] = matrix_multiply_vector( matWorld, tri.p[0] );
-                triTransformed.p[1] = matrix_multiply_vector( matWorld, tri.p[1] );
-                triTransformed.p[2] = matrix_multiply_vector( matWorld, tri.p[2] );
-
-                // After translation into world, but after projection onto screen, we
-                // want to fuck off the triangles that should not be seen.
-                vec3d normal, line1, line2;
-
-                // Get lines either side of the triangle
-                line1 = vector_sub( triTransformed.p[1], triTransformed.p[0] );
-                line2 = vector_sub( triTransformed.p[2], triTransformed.p[0] );
-
-                // Take cross product of lines to get normal to triangle surface
-                normal = vector_cross_product( line1, line2 );
-
-                normal = vector_normalize( normal );
-
-                vec3d vCameraRay = vector_sub(triTransformed.p[0], vCamera);
-
-                // If ray is aligned with normal, then triangle is visible.
-                if ( vector_dot_product(normal, vCameraRay) < 0.0f )
-                {
+            for(unsigned int i = 0; i < 10; i++) {
                     
-                    // Illumination
-                    vec3d light_direction =  {0.0f, 1.0f, -1.0f};
-                    light_direction = vector_normalize( light_direction );
-                    float32 dp = vector_dot_product( light_direction, normal );
-                    if (dp < 0.1f) dp = 0.1f;
+                // calculate the model matrix for each object and pass it to shader before drawing
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, cubePositions[i]);
+                float32 angle = 20.f * i + 20.f;
+                model = glm::rotate(model, (float32)glfwGetTime()* glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                ourShader.setMat4f("model", model);
 
-                    get_color_by_lum(dp, triTransformed.color);
-
-                    // Convert world space -> view space
-                    triViewed.p[0] = matrix_multiply_vector(matView, triTransformed.p[0]);
-                    triViewed.p[1] = matrix_multiply_vector(matView, triTransformed.p[1]);
-                    triViewed.p[2] = matrix_multiply_vector(matView, triTransformed.p[2]);
-
-                    triViewed.color = triTransformed.color;
-
-                    // Clip Viewed Triangle against near plane, this could form two additional
-                    // additional triangles. 
-                    int nClippedTriangles = 0;
-                    triangle clipped[2];
-                    nClippedTriangles = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.1f }, { 0.0f, 0.0f, 1.0f }, triViewed, clipped[0], clipped[1]);
-
-                    // We may end up with multiple triangles form the clip, so project as
-                    // required
-                    for (int n = 0; n < nClippedTriangles; n++)
-                    {
-                        // Project triangles from 3D --> 2D
-                        triProjected.p[0] = matrix_multiply_vector(matProj, clipped[n].p[0]);
-                        triProjected.p[1] = matrix_multiply_vector(matProj, clipped[n].p[1]);
-                        triProjected.p[2] = matrix_multiply_vector(matProj, clipped[n].p[2]);
-                        triProjected.color = clipped[n].color;
-
-                        // Scale into view, we moved the normalising into cartesian space
-                        // out of the matrix.vector function from the previous videos, so
-                        // do this manually
-                        triProjected.p[0] = vector_div(triProjected.p[0], triProjected.p[0].w);
-                        triProjected.p[1] = vector_div(triProjected.p[1], triProjected.p[1].w);
-                        triProjected.p[2] = vector_div(triProjected.p[2], triProjected.p[2].w);
-
-                        // Offset verts into visible normalised space
-                        vec3d vOffsetView = { 1,1,0 };
-                        triProjected.p[0] = vector_add(triProjected.p[0], vOffsetView);
-                        triProjected.p[1] = vector_add(triProjected.p[1], vOffsetView);
-                        triProjected.p[2] = vector_add(triProjected.p[2], vOffsetView);
-                        triProjected.p[0].x *= 0.5f * (float32) width;
-                        triProjected.p[0].y *= 0.5f * (float32) height;
-                        triProjected.p[1].x *= 0.5f * (float32) width;
-                        triProjected.p[1].y *= 0.5f * (float32) height;
-                        triProjected.p[2].x *= 0.5f * (float32) width;
-                        triProjected.p[2].y *= 0.5f * (float32) height;
-
-                        // Store triangle for sorting
-                        vecTrianglesToRaster.push_back(triProjected);
-                    }			
-
-                }
+                glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
-            std::sort(vecTrianglesToRaster.begin(), vecTrianglesToRaster.end(), [](triangle &t1, triangle &t2)
-            {
-                float32 z1 = (t1.p[0].z + t1.p[1].z + t1.p[2].z) / 3.0f;
-                float32 z2 = (t2.p[0].z + t2.p[1].z + t2.p[2].z) / 3.0f;
-                return z1 > z2;
-            });
 
-            // Loop through all transformed, viewed, projected, and sorted triangles
-            for (auto &triToRaster : vecTrianglesToRaster)
-            {
-                // Clip triangles against all four screen edges, this could yield
-                // a bunch of triangles, so create a queue that we traverse to 
-                //  ensure we only test new triangles generated against planes
-                triangle clipped[2];
-                std::list<triangle> listTriangles;
-
-                // Add initial triangle
-                listTriangles.push_back(triToRaster);
-                int nNewTriangles = 1;
-
-                for (int p = 0; p < 4; p++)
-                {
-                    int nTrisToAdd = 0;
-                    while (nNewTriangles > 0)
-                    {
-                        // Take triangle from front of queue
-                        triangle test = listTriangles.front();
-                        listTriangles.pop_front();
-                        nNewTriangles--;
-
-                        // Clip it against a plane. We only need to test each 
-                        // subsequent plane, against subsequent new triangles
-                        // as all triangles after a plane clip are guaranteed
-                        // to lie on the inside of the plane. I like how this
-                        // comment is almost completely and utterly justified
-                        switch (p)
-                        {
-                        case 0:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
-                        case 1:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, height - 1, 0.0f }, { 0.0f, -1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
-                        case 2:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
-                        case 3:	nTrisToAdd = Triangle_ClipAgainstPlane({ width - 1, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
-                        }
-
-                        // Clipping may yield a variable number of triangles, so
-                        // add these new ones to the back of the queue for subsequent
-                        // clipping against next planes
-                        for (int w = 0; w < nTrisToAdd; w++)
-                            listTriangles.push_back(clipped[w]);
-                    }
-                    nNewTriangles = listTriangles.size();
-                }
-
-
+<<<<<<< HEAD
                 // Draw the transformed, viewed, clipped, projected, sorted, clipped triangles
                 for (auto &t : listTriangles)
                 {
                     draw_triangle_filled( t );
                         draw_triangle( t );
+=======
+            // Draw players
+            for( uint32 i = 0; i < player_states.size(); i++ ) {
+                if ( i != local_i ) {
+                    printf("[i: %d]", i);
+                    glm::mat4 model = glm::mat4(1.0f);
+                    model = glm::translate(model, player_states[i]->position);
+                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+                    ourShader.setMat4f("model", model);
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+>>>>>>> opengl-3
                 }
             }
 
             
+
+            /*
+
             if ( history_mode_on ) {
-                render_players_with_history( player_states, state_got );
+
+                // TODO: fix render_players_with_history.
+                //render_players_with_history( player_states, local_id, state_got );
+                render_players( player_states, local_id, state_got );
             }
             else {
-                render_players( player_states, state_got );
-            }
+                render_players( player_states, local_id, state_got );
+            }*/
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -753,13 +363,11 @@ public:
         }
     }
 
-private:
-
-    struct vector2f {
-        float64 x, y;
+    struct vector3f {
+        float32 x, y, z;
     };
 
-    struct client_history_pos : vector2f {
+    struct client_history_pos : vector3f {
         bool8 state_got;
     };
 
@@ -769,60 +377,70 @@ private:
 
     bool8 history_mode_on = true;
     size_t max_history_len = 100;
-
-
     
     void render_player(Player::PlayerState* ps, bool8 state_got) {
-
-        Rect_w rect = Rect_w(ps->x, ps->y, player_width, player_height);
-        rect.render( state_got );
-
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, ps->position);
+        model = glm::rotate(model, glm::radians(ps->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(ps->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
+        ourShader.setMat4f("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
-    void render_players(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for( size_t i = 0; i < player_states.size(); i++) {
-            render_player(player_states[i], state_got);
+            if ( player_states[i]->id != local_id ) {
+                render_player(player_states[i], state_got);
+            }
         }
 
     }
 
-    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for(int i = 0; i < player_states.size(); i++) {
 
             uint32 player_id = player_states[i]->id;
 
-            // Add player to history map.
-            if ( player_positions.count( player_id ) < 1 ) {
-                history_pos hpos;
-                player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
-            }
+            if (player_id != local_id ) {
 
-            if ( player_positions.count( player_id )) {
-
-                // Add new position to history
-                player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
-
-                // Delete oldest history pos.
-                if ( player_positions[player_id].size() > max_history_len ) {
-                    player_positions[player_id].erase( player_positions[player_id].begin() );
+                // Add player to history map.
+                if ( player_positions.count( player_id ) < 1 ) {
+                    history_pos hpos;
+                    //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
                 }
-            }
 
-            // Draw history.
-            for( auto const& pos : player_positions[ player_id ]) {
-                Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
-                rect.render( pos.state_got );
+                if ( player_positions.count( player_id )) {
+
+                    // Add new position to history
+                    //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
+
+                    // Delete oldest history pos.
+                    if ( player_positions[player_id].size() > max_history_len ) {
+                        player_positions[player_id].erase( player_positions[player_id].begin() );
+                    }
+                }
+
+                // Draw history.
+                for( auto const& pos : player_positions[ player_id ]) {
+                    Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
+                    rect.render( pos.state_got );
+                }
             }
         }
     }
 
 };
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}  
+
 FRESULT create_window(GraphicsHandle& handle) {
     
-    handle.window = glfwCreateWindow(1000, 1000, "Well hello there", NULL, NULL);
+    handle.window = glfwCreateWindow(window_coord_width, window_coord_width, "Well hello there", NULL, NULL);
 
     if (!handle.window) {
         glfwTerminate();
@@ -830,14 +448,10 @@ FRESULT create_window(GraphicsHandle& handle) {
     }
 
     glfwMakeContextCurrent(handle.window);
-    glClearColor(0.0, 0.0, 0.0, 0.0);           // black background
-    glMatrixMode(GL_PROJECTION);                // setup viewing projection
-    glLoadIdentity();                           // start with identity matrix
 
-    // Oh my god. This is amazing. We DON'T HAVE TO SCALE STUFF MANUALLY!!!!!
-    glOrtho(0.0, window_coord_width, 0.0, window_coord_height, -1.0, 10000.0);
-    
     glfwSwapInterval(1);
+
+    glfwSetFramebufferSizeCallback(handle.window, framebuffer_size_callback);
 
     return FRESULT(FR_OK);
 }
@@ -848,15 +462,15 @@ FRESULT init() {
         return FRESULT(FR_FAILURE);
     }
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     return FRESULT(FR_OK);
     
 };
 
 FRESULT terminate() {
-
     glfwTerminate();
     return FRESULT(FR_OK);
 
