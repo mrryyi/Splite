@@ -62,7 +62,7 @@ public:
 
 
 class GraphicsHandle {
-private:
+public:
     mesh meshCube;
     mat4x4 matProj;
 
@@ -96,8 +96,6 @@ private:
     float32 last_mouse_y = window_coord_height / 2.0f;
     bool firstMouse = true;
 
-public:
-
     const float DEG2RAD = 3.14159 / 180;
     float radius = 0.25;
 
@@ -113,7 +111,6 @@ public:
     Shader ourShader;
 
     Camera camera;
-
     
     unsigned int texture1;
     unsigned int texture2;
@@ -271,44 +268,8 @@ public:
         ourShader.setInt("texture1", 0);
     }
 
-    void handle_keyboard_input(float32 delta_time) {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
-
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            camera.ProcessKeyboard(FORWARD, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            camera.ProcessKeyboard(BACKWARD, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            camera.ProcessKeyboard(LEFT, delta_time);
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            camera.ProcessKeyboard(RIGHT, delta_time);
-    };
-
-    void handle_mouse_input() {
-        GLdouble x_pos_now, y_pos_now;
-        glfwGetCursorPos(window, &x_pos_now, &y_pos_now);
-
-        if ( firstMouse ) {
-            last_mouse_x = x_pos_now;
-            last_mouse_y = y_pos_now;
-            firstMouse = false;
-        }
-
-        float32 x_offset = x_pos_now - last_mouse_x;
-        float32 y_offset = last_mouse_y - y_pos_now;
-
-        last_mouse_x = x_pos_now;
-        last_mouse_y = y_pos_now;
-
-        camera.ProcessMouseMovement( x_offset, y_offset );
-    };
-
     // Updates graphics.
-    FRESULT Update( std::vector<Player::PlayerState*>& player_states, bool8 state_got, float32 delta_time ) {
-
-        handle_keyboard_input(delta_time);
-        handle_mouse_input();
+    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_i, bool8 state_got, float32 delta_time ) {
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -328,7 +289,7 @@ public:
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
-            projection = glm::perspective(glm::radians(45.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
+            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
             
             view = camera.GetViewMatrix();
             // pass transformation matrices to the shader
@@ -351,12 +312,32 @@ public:
             }
 
 
+            // Draw players
+            for( uint32 i = 0; i < player_states.size(); i++ ) {
+                if ( i != local_i ) {
+                    printf("[i: %d]", i);
+                    glm::mat4 model = glm::mat4(1.0f);
+                    model = glm::translate(model, player_states[i]->position);
+                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+                    ourShader.setMat4f("model", model);
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                }
+            }
+
+            
+
+            /*
+
             if ( history_mode_on ) {
-                render_players_with_history( player_states, state_got );
+
+                // TODO: fix render_players_with_history.
+                //render_players_with_history( player_states, local_id, state_got );
+                render_players( player_states, local_id, state_got );
             }
             else {
-                render_players( player_states, state_got );
-            }
+                render_players( player_states, local_id, state_got );
+            }*/
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -374,13 +355,11 @@ public:
         }
     }
 
-private:
-
-    struct vector2f {
-        float64 x, y;
+    struct vector3f {
+        float32 x, y, z;
     };
 
-    struct client_history_pos : vector2f {
+    struct client_history_pos : vector3f {
         bool8 state_got;
     };
 
@@ -392,47 +371,54 @@ private:
     size_t max_history_len = 100;
     
     void render_player(Player::PlayerState* ps, bool8 state_got) {
-
-        Rect_w rect = Rect_w(ps->x, ps->y, player_width, player_height);
-        rect.render( state_got );
-
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, ps->position);
+        model = glm::rotate(model, glm::radians(ps->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(ps->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
+        ourShader.setMat4f("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
-    void render_players(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for( size_t i = 0; i < player_states.size(); i++) {
-            render_player(player_states[i], state_got);
+            if ( player_states[i]->id != local_id ) {
+                render_player(player_states[i], state_got);
+            }
         }
 
     }
 
-    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, bool8 state_got) {
+    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
 
         for(int i = 0; i < player_states.size(); i++) {
 
             uint32 player_id = player_states[i]->id;
 
-            // Add player to history map.
-            if ( player_positions.count( player_id ) < 1 ) {
-                history_pos hpos;
-                player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
-            }
+            if (player_id != local_id ) {
 
-            if ( player_positions.count( player_id )) {
-
-                // Add new position to history
-                player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
-
-                // Delete oldest history pos.
-                if ( player_positions[player_id].size() > max_history_len ) {
-                    player_positions[player_id].erase( player_positions[player_id].begin() );
+                // Add player to history map.
+                if ( player_positions.count( player_id ) < 1 ) {
+                    history_pos hpos;
+                    //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
                 }
-            }
 
-            // Draw history.
-            for( auto const& pos : player_positions[ player_id ]) {
-                Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
-                rect.render( pos.state_got );
+                if ( player_positions.count( player_id )) {
+
+                    // Add new position to history
+                    //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
+
+                    // Delete oldest history pos.
+                    if ( player_positions[player_id].size() > max_history_len ) {
+                        player_positions[player_id].erase( player_positions[player_id].begin() );
+                    }
+                }
+
+                // Draw history.
+                for( auto const& pos : player_positions[ player_id ]) {
+                    Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
+                    rect.render( pos.state_got );
+                }
             }
         }
     }

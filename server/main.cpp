@@ -60,8 +60,6 @@ int main() {
 
     ClientMap clients;
 
-    Player::PlayerInput empty_player_input = Player::PlayerInput();
-
     char buffer[SOCKET_BUFFER_SIZE];
     int flags = 0;
     SOCKADDR_IN from;
@@ -89,11 +87,14 @@ int main() {
             bytes_received = recvfrom( sock, (char*) r_Msg.buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&r_Msg.address, &r_Msg.address_size );
             
             if ( bytes_received != SOCKET_ERROR ) {
-                switch ( (Network::ClientMessageType) r_Msg.buffer[0] ){
+
+                uint8 message_type = r_Msg.buffer[0];
+
+                switch ( message_type ){
                     case Network::ClientMessageType::RegisterRequest:
                     {
 
-                        printf("Register request.\n");
+                        printf("Register request -> Send register syn.\n");
                         uint32 id_for_client = ++lastID;
                         Network::Message s_Msg;
                         msg_size = Network::server_msg_syn_write( s_Msg.buffer, id_for_client );
@@ -103,16 +104,19 @@ int main() {
                     break;
                     case Network::ClientMessageType::RegisterAck:
                     {
+                        printf("Register ack: ");
 
                         uint8 yes_no = 0;
                         uint32 id;
                         Network::client_msg_ack_read( r_Msg.buffer, &id );
-                        printf("registerack");
 
                         if ( clients.size() < MAX_CLIENTS_CONNECTED && clients.count( id ) == 0 ) {
                             yes_no = 1;
                             clients[id] = new Client( id, r_Msg.address );
                             printf("New client registered.\n");
+                        }
+                        else {
+                            printf("Client denied.\n");
                         }
 
                         Network::Message s_Msg;
@@ -123,6 +127,7 @@ int main() {
                     break;
                     case Network::ClientMessageType::ConnectionResponse:
                     {
+
                         uint32 id;
                         Network::client_msg_connection_read( r_Msg.buffer, &id );
                         if ( clients.count( id ) > 0 ) {
@@ -130,10 +135,17 @@ int main() {
                             clients[id]->last_seen = now;
                             clients[id]->last_asked = now;
                         }
+                        else {
+                            Network::Message s_Msg;
+                            msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
+                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
+                        }
+                        
                     }
                     break;
                     case Network::ClientMessageType::Input:
                     {
+                        
                         uint32 id;
                         uint64 timestamp_ms;
                         Player::PlayerInput player_input;
@@ -142,11 +154,19 @@ int main() {
                         if( clients.count( id ) > 0 ) {
                             uint64 time_now = timeSinceEpochMillisec();
                             clients[id]->input = player_input;
-                            clients[id]->last_seen = timeSinceEpochMillisec();
-                            clients[id]->last_asked = timeSinceEpochMillisec();
+                            clients[id]->last_seen = time_now;
+                            clients[id]->last_asked = time_now;
+                        }
+                        else {
+                            Network::Message s_Msg;
+                            msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
+                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
                         }
                     }
                     default:
+                    {
+                        printf("Invalid message received.\n");
+                    }
                     break;
                 } // End switch
             } // End if bytes_received is not socket error
