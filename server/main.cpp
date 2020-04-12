@@ -89,7 +89,7 @@ int main() {
             if ( bytes_received != SOCKET_ERROR ) {
 
                 uint8 message_type = r_Msg.buffer[0];
-                
+
                 switch ( message_type ){
                     case Network::ClientMessageType::RegisterRequest:
                     {
@@ -124,6 +124,7 @@ int main() {
                     break;
                     case Network::ClientMessageType::ConnectionResponse:
                     {
+
                         uint32 id;
                         Network::client_msg_connection_read( r_Msg.buffer, &id );
                         if ( clients.count( id ) > 0 ) {
@@ -131,6 +132,12 @@ int main() {
                             clients[id]->last_seen = now;
                             clients[id]->last_asked = now;
                         }
+                        else {
+                            Network::Message s_Msg;
+                            msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
+                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
+                        }
+                        
                     }
                     break;
                     case Network::ClientMessageType::Input:
@@ -144,8 +151,13 @@ int main() {
                         if( clients.count( id ) > 0 ) {
                             uint64 time_now = timeSinceEpochMillisec();
                             clients[id]->input = player_input;
-                            clients[id]->last_seen = timeSinceEpochMillisec();
-                            clients[id]->last_asked = timeSinceEpochMillisec();
+                            clients[id]->last_seen = time_now;
+                            clients[id]->last_asked = time_now;
+                        }
+                        else {
+                            Network::Message s_Msg;
+                            msg_size = Network::server_msg_kicked_write( s_Msg.buffer );
+                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
                         }
                     }
                     default:

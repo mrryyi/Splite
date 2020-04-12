@@ -269,7 +269,7 @@ public:
     }
 
     // Updates graphics.
-    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got, float32 delta_time ) {
+    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_i, bool8 state_got, float32 delta_time ) {
 
         if ( !window ) {
             return FRESULT(FR_FAILURE);
@@ -311,12 +311,33 @@ public:
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
+
+            // Draw players
+            for( uint32 i = 0; i < player_states.size(); i++ ) {
+                if ( i != local_i ) {
+                    printf("[i: %d]", i);
+                    glm::mat4 model = glm::mat4(1.0f);
+                    model = glm::translate(model, player_states[i]->position);
+                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
+                    ourShader.setMat4f("model", model);
+                    glDrawArrays(GL_TRIANGLES, 0, 36);
+                }
+            }
+
+            
+
+            /*
+
             if ( history_mode_on ) {
-                render_players_with_history( player_states, local_id, state_got );
+
+                // TODO: fix render_players_with_history.
+                //render_players_with_history( player_states, local_id, state_got );
+                render_players( player_states, local_id, state_got );
             }
             else {
                 render_players( player_states, local_id, state_got );
-            }
+            }*/
             
             glfwSwapBuffers(window);
             glfwPollEvents();
