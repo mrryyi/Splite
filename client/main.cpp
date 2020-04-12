@@ -143,8 +143,6 @@ int main() {
                 Network::Message r_Msg;
                 r_Msg.address = from;
                 r_Msg.address_size = from_size;
-
-                printf("hello, bytes_received != socket error!\n");
                 
                 memcpy( &r_Msg.buffer, &buffer, SOCKET_BUFFER_SIZE );
 
