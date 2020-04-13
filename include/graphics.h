@@ -109,6 +109,7 @@ public:
     unsigned int shaderProgram_2;
 
     Shader ourShader;
+    Shader lightsourceShader;
 
     Camera camera;
     
@@ -118,13 +119,12 @@ public:
     unsigned int VBOs[2];
     unsigned int VAOs[2];
     unsigned int EBOs[2];
+    unsigned int lightVAO;
+
+    glm::vec3 lightPos = glm::vec3( 1.2f, 1.0f, -10.0f );
 
     // world space positions of our cubes
     std::vector<glm::vec3> cubePositions;
-
-    glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
-    glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
     GraphicsHandle() {
         
@@ -137,6 +137,8 @@ public:
         glDeleteBuffers(2, VBOs);
         glDeleteBuffers(2, EBOs);
     }
+
+
 
     void init() {
 
@@ -154,59 +156,98 @@ public:
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        ourShader = Shader("../shaders/3.3.shader.vert", "../shaders/3.3.shader.frag");
+        ourShader = Shader("../shaders/object_shader.vert", "../shaders/object_shader.frag");
 
         int  success;
         char infoLog[512];
 
-        glEnable(GL_DEPTH_TEST);  
-
+        glEnable(GL_DEPTH_TEST);
 
         // set up vertex data (and buffer(s)) and configure vertex attributes
         // ------------------------------------------------------------------
+        
+        /*float vertices[] = {
+        // vertice coords       // texture       // Normal
+        -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,      0.0f,  0.0f, -1.0f,
+         0.5f, -0.5f, -0.5f,    1.0f, 0.0f,      0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  0.0f, -1.0f,
+        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,      0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  0.0f, 1.0f,
+         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  0.0f, 1.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 1.0f,      0.0f,  0.0f, 1.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 1.0f,      0.0f,  0.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f,    0.0f, 1.0f,      0.0f,  0.0f, 1.0f,
+        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  0.0f, 1.0f,
+        -0.5f,  0.5f,  0.5f,    1.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,    1.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,    1.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,    1.0f, 1.0f,      0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      0.0f, -1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  1.0f,  0.0f
+        };*/
+
         float vertices[] = {
-        // vertice coords  // color coords 
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
 
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
 
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
 
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
 
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
         };
         
         cubePositions.push_back( glm::vec3( 0.0f,  0.0f,  0.0f) );
@@ -231,10 +272,10 @@ public:
         glBufferData( GL_ARRAY_BUFFER, sizeof( vertices ), vertices, GL_STATIC_DRAW );
 
         // position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
-        // texture coord attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        // normal attribute
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
 
         // texture 1
@@ -265,7 +306,70 @@ public:
         // tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
         // -------------------------------------------------------------------------------------------
         ourShader.use();
-        ourShader.setInt("texture1", 0);
+        ourShader.setVec3f("lightColor", 1.0f, 0.5f, 1.0f);
+        ourShader.setVec3f("objectColor", 1.0f, 0.5f, 0.31f);
+
+
+
+        // Light source
+
+        // set up vertex data (and buffer(s)) and configure vertex attributes
+        // ------------------------------------------------------------------
+        float lightsource_vertices[] = {
+            -0.5f, -0.5f, -0.5f, 
+            0.5f, -0.5f, -0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            -0.5f,  0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+
+            -0.5f, -0.5f,  0.5f, 
+            0.5f, -0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f, -0.5f,  0.5f, 
+
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f,  0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+            -0.5f, -0.5f,  0.5f, 
+            -0.5f,  0.5f,  0.5f, 
+
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f, -0.5f,  
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+
+            -0.5f, -0.5f, -0.5f, 
+            0.5f, -0.5f, -0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            0.5f, -0.5f,  0.5f,  
+            -0.5f, -0.5f,  0.5f, 
+            -0.5f, -0.5f, -0.5f, 
+
+            -0.5f,  0.5f, -0.5f, 
+            0.5f,  0.5f, -0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            0.5f,  0.5f,  0.5f,  
+            -0.5f,  0.5f,  0.5f, 
+            -0.5f,  0.5f, -0.5f, 
+        };
+        glGenVertexArrays( 1, &lightVAO );
+        glBindVertexArray( lightVAO );
+
+        glBindBuffer( GL_ARRAY_BUFFER, VBOs[1] );
+        glBufferData(GL_ARRAY_BUFFER, sizeof(lightsource_vertices), lightsource_vertices, GL_STATIC_DRAW);
+        
+        // Set the vertex attributes
+        glVertexAttribPointer( 0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray( 0 );
+
+        // Light source shader
+        lightsourceShader = Shader("../shaders/lightsource.vert", "../shaders/lightsource.frag");
     }
 
     // Updates graphics.
@@ -281,20 +385,25 @@ public:
             // state-using function
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
-            ourShader.use();
-
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE, texture1);
-
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
             projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
             
             view = camera.GetViewMatrix();
+
+            ourShader.use();
+
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE, texture1);
+
+            lightPos.x = 1.0f + sin(glfwGetTime()) * 2.0f;
+            lightPos.y = sin(glfwGetTime() / 2.0f) * 1.0f;
             // pass transformation matrices to the shader
             ourShader.setMat4f("projection", projection); // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
             ourShader.setMat4f("view", view);
+            ourShader.setVec3f("lightPos", lightPos);
+            ourShader.setVec3f("viewPos", camera.Position);
 
             glBindVertexArray(VAOs[0]);
 
@@ -302,24 +411,29 @@ public:
                     
                 // calculate the model matrix for each object and pass it to shader before drawing
                 glm::mat4 model = glm::mat4(1.0f);
-                model = glm::translate(model, cubePositions[i]);
                 float32 angle = 20.f * i + 20.f;
-                model = glm::rotate(model, (float32)glfwGetTime()* glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                model = glm::translate(model, cubePositions[i]);
+                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
                 model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
                 ourShader.setMat4f("model", model);
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
 
+            // also draw the lightsource object
+            lightsourceShader.use();
+            lightsourceShader.setMat4f("projection", projection);
+            lightsourceShader.setMat4f("view", view);
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, lightPos);
+            model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
+            lightsourceShader.setMat4f("model", model);
+            glBindVertexArray( lightVAO );
+            glDrawArrays(GL_TRIANGLES, 0, 36);
 
-<<<<<<< HEAD
-                // Draw the transformed, viewed, clipped, projected, sorted, clipped triangles
-                for (auto &t : listTriangles)
-                {
-                    draw_triangle_filled( t );
-                        draw_triangle( t );
-=======
             // Draw players
+            glBindVertexArray(VAOs[0]);
+            ourShader.use();
             for( uint32 i = 0; i < player_states.size(); i++ ) {
                 if ( i != local_i ) {
                     printf("[i: %d]", i);
@@ -329,7 +443,6 @@ public:
                     model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
                     ourShader.setMat4f("model", model);
                     glDrawArrays(GL_TRIANGLES, 0, 36);
->>>>>>> opengl-3
                 }
             }
 

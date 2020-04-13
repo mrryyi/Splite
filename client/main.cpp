@@ -240,7 +240,7 @@ int main() {
 
         now = timeSinceEpochMillisec();
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;
-        printf("time heard from server ms: %d", time_since_heard_from_server_ms);
+        //printf("time heard from server ms: %d", time_since_heard_from_server_ms);
         
         
         if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
@@ -253,7 +253,7 @@ int main() {
         }
         
 
-        printf("[Connected: { %d }]\n", connected);
+        //printf("[Connected: { %d }]\n", connected);
 
         if ( connected != true ) {
             now = timeSinceEpochMillisec();
@@ -290,7 +290,7 @@ int main() {
                 Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
 
                 graphics_handle.camera.SetCamera( player_states[i]->position, player_states[i]->yaw, player_states[i]->pitch );
-                Player::print_player_state( *player_states[i] );
+                //Player::print_player_state( *player_states[i] );
             }
             else {
                 Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
