@@ -4,7 +4,8 @@
 #include "graphics.h"
 #include "player.h"
 
-void process_input( graphics::GraphicsHandle &handle, Player::PlayerInput& input ) {
+void process_input( graphics::GraphicsHandle &handle, Camera& camera, Player::PlayerInput& input ) {
+    
     if (glfwGetKey( handle.window, GLFW_KEY_ESCAPE ) == GLFW_PRESS ){
         glfwSetWindowShouldClose( handle.window, true );
     }
@@ -30,9 +31,9 @@ void process_input( graphics::GraphicsHandle &handle, Player::PlayerInput& input
     handle.last_mouse_x = x_pos_now;
     handle.last_mouse_y = y_pos_now;
 
-    handle.camera.LoadMouseMovement( x_offset, y_offset );
+    camera.LoadMouseMovement( x_offset, y_offset );
 
-    input.yaw = handle.camera.Yaw;
-    input.pitch = handle.camera.Pitch;
+    input.yaw = camera.Yaw;
+    input.pitch = camera.Pitch;
 
 };

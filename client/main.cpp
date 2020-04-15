@@ -5,6 +5,7 @@
 #include <glad/glad.h>
 #include "..\include\input.h"
 #include "..\include\graphics.h"
+#include <mutex>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -15,27 +16,36 @@ int main() {
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
     FRESULT fr;
+    Game::LocalScene mainScene;
+    GLFWwindow* window;
+    
+    graphics::GraphicsHandle graphics_handle;
+
+    graphics_handle.scene = &mainScene;
+    graphics_handle.window = window;
 
     fr = graphics::init();
     if (fr) {
+        printf("whattafack we failed to init graphics.\n");
         exit(EXIT_FAILURE);
     }
 
-    graphics::GraphicsHandle graphics_handle;
-
-    fr = graphics::create_window(graphics_handle);
+    fr = graphics::create_window( graphics_handle );
     if (fr) {
         printf("WHAT THE FACK WE FAILED CREATING A WINDOW.\n");
         exit(EXIT_FAILURE);
     }
+        
+    Camera camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
-       printf("Failed to initialize GLAD");
+        printf("Failed to initialize GLAD");
         return -1;
     }
 
     glViewport(0, 0, window_coord_width, window_coord_height);
+
 
     graphics_handle.init();
     
@@ -113,10 +123,10 @@ int main() {
 
     bool running = true;
 
-    std::vector<Player::PlayerState*> player_states;
-
     Player::PlayerState last_known_player_state( NO_ID_GIVEN, glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) );
-    player_states.push_back(&last_known_player_state);
+    
+    mainScene.add_player_state( last_known_player_state );
+
     uint32 local_player_state_i;
     bool8 connected = false;
     uint32 id_from_server = NO_ID_GIVEN;
@@ -130,9 +140,13 @@ int main() {
     
     printf("Running.\nAttempting to connect...\n");
 
+    std::thread render_thread;
+
     while( !glfwWindowShouldClose( graphics_handle.window )) {
         
         bool8 state_got_this_tick = false;
+
+        printf("New tick.\n");
 
         while ( Timer_ms::timer_get_ms_since_start() < local_milliseconds_per_tick) {
             int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
@@ -187,6 +201,7 @@ int main() {
                     break;
                     case Network::ServerMessageType::ConnectionRequest:
                     {
+
                         printf("Connection upkeep.\n");
                         Network::Message s_Msg;
                         msg_size = Network::client_msg_connection_write( s_Msg.buffer, id_from_server );
@@ -199,14 +214,15 @@ int main() {
 
                         state_got_this_tick = true;
 
-                        player_states.clear();
                         uint64 tick;
-                        Network::server_msg_player_states_read( r_Msg.buffer, &player_states, &tick );
+                        mainScene.clear_player_states();
+                        Network::server_msg_player_states_read( r_Msg.buffer, &mainScene.m_player_states, &tick );
 
                         printf("Server tick: %d\n", tick);
-                        for(int i = 0; i < player_states.size(); i++) {
-                            if (player_states[i]->id == id_from_server) {
+                        for(int i = 0; i < mainScene.m_player_states.size(); i++) {
+                            if (mainScene.m_player_states[i].id == id_from_server) {
                                 // Copy
+                                mainScene.m_local_player_state_i = i;
                                 local_player_state_i = i;
                                 break;
                             }
@@ -220,8 +236,7 @@ int main() {
                         printf("Kicked");
                         connected = false;
                         id_from_server = NO_ID_GIVEN;
-                        player_states.clear();
-                        player_states.push_back(&last_known_player_state);
+                        mainScene.became_offline();
                         local_player_state_i = 0;
 
                     }
@@ -242,17 +257,13 @@ int main() {
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;
         //printf("time heard from server ms: %d", time_since_heard_from_server_ms);
         
-        
         if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
             printf("Not connected anymore.");
             connected = false;
             id_from_server = NO_ID_GIVEN;
-            player_states.clear();
-            player_states.push_back(&last_known_player_state);
+            mainScene.became_offline();
             local_player_state_i = 0;
         }
-        
-
         //printf("[Connected: { %d }]\n", connected);
 
         if ( connected != true ) {
@@ -271,7 +282,7 @@ int main() {
         Player::PlayerInput old_input = input;
 
         // Now we have pitch and yaw into our input.
-        process_input( graphics_handle, input );
+        process_input( graphics_handle, camera, input );
         
         if ( connected && id_from_server != NO_ID_GIVEN ) {
 
@@ -284,34 +295,20 @@ int main() {
 
         }
 
-        for(int i = 0; i < player_states.size(); i++) {
+        mainScene.tick_players( input, local_milliseconds_per_tick );
+        mainScene.inform_camera( &camera );
 
-            if ( i == local_player_state_i ) {
-                Player::tick_player_by_input( *player_states[i], input, local_milliseconds_per_tick );
+        graphics_handle.camera = camera;
 
-                graphics_handle.camera.SetCamera( player_states[i]->position, player_states[i]->yaw, player_states[i]->pitch );
-                //Player::print_player_state( *player_states[i] );
-            }
-            else {
-                Player::tick_player_by_physics( *player_states[i], local_milliseconds_per_tick);
-            }
-
-        }
-        // Update graphics
-        // Should take in a gamestate object.
         now = timeSinceEpochMillisec();
-        bool8 hmt_pressed_now = (bool8) glfwGetKey( graphics_handle.window, GLFW_KEY_H );
         // Toggle history mode by button release.
+        bool8 hmt_pressed_now = (bool8) glfwGetKey( graphics_handle.window, GLFW_KEY_H );
         if (  (!hmt_pressed_last_tick && hmt_pressed_now) ) {
             graphics_handle.history_mode_toggle();
         }
         hmt_pressed_last_tick = hmt_pressed_now;
 
-        uint64 delta_frame_time = now - last_frame_ms;
-        if ( delta_frame_time >= milliseconds_per_frame ) {
-            graphics_handle.Update( player_states, local_player_state_i, state_got_this_tick, milliseconds_per_frame );
-            last_frame_ms = now;
-        }
+        graphics_handle.Update( state_got_this_tick, local_milliseconds_per_tick );
 
     }
 

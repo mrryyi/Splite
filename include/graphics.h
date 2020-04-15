@@ -112,6 +112,8 @@ public:
     Shader lightsourceShader;
 
     Camera camera;
+    Game::LocalScene* scene;
+    std::mutex* scene_update_mutex;
     
     unsigned int texture1;
     unsigned int texture2;
@@ -165,46 +167,6 @@ public:
 
         // set up vertex data (and buffer(s)) and configure vertex attributes
         // ------------------------------------------------------------------
-        
-        /*float vertices[] = {
-        // vertice coords       // texture       // Normal
-        -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,      0.0f,  0.0f, -1.0f,
-         0.5f, -0.5f, -0.5f,    1.0f, 0.0f,      0.0f,  0.0f, -1.0f,
-         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  0.0f, -1.0f,
-         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  0.0f, -1.0f,
-        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  0.0f, -1.0f,
-        -0.5f, -0.5f, -0.5f,    0.0f, 0.0f,      0.0f,  0.0f, -1.0f,
-        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 1.0f,      0.0f,  0.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 1.0f,      0.0f,  0.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,    0.0f, 1.0f,      0.0f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  0.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,    1.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f,    1.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,     -1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f,    1.0f, 0.0f,     -1.0f,  0.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      1.0f,  0.0f,  0.0f,
-         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      1.0f,  0.0f,  0.0f,
-         0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      1.0f,  0.0f,  0.0f,
-         0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      1.0f,  0.0f,  0.0f,
-         0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      1.0f,  0.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      1.0f,  0.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      0.0f, -1.0f,  0.0f,
-         0.5f, -0.5f, -0.5f,    1.0f, 1.0f,      0.0f, -1.0f,  0.0f,
-         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f, -1.0f,  0.0f,
-         0.5f, -0.5f,  0.5f,    1.0f, 0.0f,      0.0f, -1.0f,  0.0f,
-        -0.5f, -0.5f,  0.5f,    0.0f, 0.0f,      0.0f, -1.0f,  0.0f,
-        -0.5f, -0.5f, -0.5f,    0.0f, 1.0f,      0.0f, -1.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  1.0f,  0.0f,
-         0.5f,  0.5f, -0.5f,    1.0f, 1.0f,      0.0f,  1.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  1.0f,  0.0f,
-         0.5f,  0.5f,  0.5f,    1.0f, 0.0f,      0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f,  0.5f,    0.0f, 0.0f,      0.0f,  1.0f,  0.0f,
-        -0.5f,  0.5f, -0.5f,    0.0f, 1.0f,      0.0f,  1.0f,  0.0f
-        };*/
 
         float vertices[] = {
         -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
@@ -370,20 +332,31 @@ public:
 
         // Light source shader
         lightsourceShader = Shader("../shaders/lightsource.vert", "../shaders/lightsource.frag");
+
+        printf("graphics::GraphicsHandle::init successful.\n");
     }
 
     // Updates graphics.
-    FRESULT Update( std::vector<Player::PlayerState*>& player_states, uint32 local_i, bool8 state_got, float32 delta_time ) {
+    FRESULT Update( bool8 state_got, float32 delta_time_ms ) {
 
+        uint64 time_started_render = timeSinceEpochMillisec();
+        printf("Start render.\n");
+        
         if ( !window ) {
             return FRESULT(FR_FAILURE);
         }
         else {
-
+            
             // state-setting function
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
             // state-using function
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            
+            // Get COPY of player states as constant as we will not alter the player states.
+            std::vector<Player::PlayerState> player_states;
+            player_states = scene->get_player_states();
+            printf("player_state size: %d\n", player_states.size());
+            uint32 local_i = scene->m_local_player_state_i;
             
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
@@ -434,13 +407,13 @@ public:
             // Draw players
             glBindVertexArray(VAOs[0]);
             ourShader.use();
+
             for( uint32 i = 0; i < player_states.size(); i++ ) {
                 if ( i != local_i ) {
-                    printf("[i: %d]", i);
                     glm::mat4 model = glm::mat4(1.0f);
-                    model = glm::translate(model, player_states[i]->position);
-                    model = glm::rotate(model, glm::radians(player_states[i]->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-                    model = glm::rotate(model, glm::radians(player_states[i]->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+                    model = glm::translate(model, player_states[i].position);
+                    model = glm::rotate(model, glm::radians(player_states[i].yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+                    model = glm::rotate(model, glm::radians(player_states[i].pitch), glm::vec3(1.0f, 0.0f, 0.0f));
                     ourShader.setMat4f("model", model);
                     glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
@@ -463,6 +436,11 @@ public:
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
+
+        uint64 now = timeSinceEpochMillisec();
+        uint64 time_took = now - time_started_render;
+        
+        printf("Render time: %d ms.\n", time_took);
 
         return FRESULT(FR_OK);
     }
@@ -551,20 +529,22 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }  
 
-FRESULT create_window(GraphicsHandle& handle) {
+FRESULT create_window( GraphicsHandle& handle ) {
     
     handle.window = glfwCreateWindow(window_coord_width, window_coord_width, "Well hello there", NULL, NULL);
 
-    if (!handle.window) {
+    if ( !handle.window ) {
         glfwTerminate();
         return FRESULT(FR_FAILURE);
     }
 
-    glfwMakeContextCurrent(handle.window);
+    printf("graphics::create_window successful.\n");
+
+    glfwMakeContextCurrent( handle.window );
 
     glfwSwapInterval(1);
 
-    glfwSetFramebufferSizeCallback(handle.window, framebuffer_size_callback);
+    glfwSetFramebufferSizeCallback( handle.window, framebuffer_size_callback );
 
     return FRESULT(FR_OK);
 }
@@ -574,6 +554,8 @@ FRESULT init() {
     if ( !glfwInit() ) {
         return FRESULT(FR_FAILURE);
     }
+
+    printf("graphics::init successful.\n");
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);

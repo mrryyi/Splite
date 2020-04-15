@@ -156,7 +156,7 @@ uint32 server_msg_player_states_write( uint8* buffer, std::vector<Player::Player
     return (uint32)(iterator - buffer);
 };
 
-void server_msg_player_states_read( uint8* buffer, std::vector<Player::PlayerState*>* player_states, uint64* tick ) {
+void server_msg_player_states_read( uint8* buffer, std::vector<Player::PlayerState>* player_states, uint64* tick ) {
     uint8* iterator = buffer;
 
     uint8 message_type;
@@ -169,8 +169,8 @@ void server_msg_player_states_read( uint8* buffer, std::vector<Player::PlayerSta
     read_uint8( &iterator, &num_players);
 
     for( uint8 i = 0; i < num_players; i++) {
-        Player::PlayerState* ps = new Player::PlayerState();
-        read_player_state( &iterator, ps );
+        Player::PlayerState ps = Player::PlayerState();
+        read_player_state( &iterator, &ps );
         player_states->push_back( ps );
     }
     
