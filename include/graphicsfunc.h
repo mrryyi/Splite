@@ -3,7 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <strstream>
-
+#include "def.h"
 namespace graphics {
 
 struct vec3d {
