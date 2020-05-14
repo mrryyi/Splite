@@ -59,12 +59,16 @@ static void write_vec3f(uint8** buffer, glm::vec3 vec3f) {
 
 static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
 
-    //  [var]  [compressed]  [how much to shift for desired bit position]
-    //  up     .... ...u     << 0
-    //  down   .... ..d.     << 1
-    //  left   .... .l..     << 2
-    //  right  .... r...     << 3
-    //  jump   ...j ....     << 4
+    //  [var]       [compressed]  [how much to shift for desired bit position]
+    //  forward     .... ...f     << 0
+    //  backward    .... ..b.     << 1
+    //  up          .... .u..     << 2
+    //  down        .... d...     << 3
+    //  left        ...l ....     << 4
+    //  right       ..r. ....     << 5
+    //  jump        .j.. ....     << 6
+    //  Last bit unused.
+
     uint8 compressed_input = 
         (uint8)(input->forward)  ? 1 << 0 : 0  |
         (uint8)(input->backward) ? 1 << 1 : 0  |
@@ -81,6 +85,7 @@ static void write_player_input(uint8** buffer, Player::PlayerInput* input) {
     write_float32(buffer, input->pitch);
 };
 
+// Not used.
 static void write_player_input_verbose(uint8** buffer, Player::PlayerInput* input) {
     write_uint8(buffer, input->forward);
     write_uint8(buffer, input->backward);
@@ -100,6 +105,11 @@ static void write_player_state(uint8** buffer, const Player::PlayerState* ps) {
     write_vec3f(buffer, ps->velocity);
     write_float32(buffer, ps->yaw);
     write_float32(buffer, ps->pitch);
+};
+
+static void write_object(uint8** buffer, const Object* obj) {
+    write_uint32(buffer, obj->id);
+    write_vec3f(buffer, obj->position);
 };
 
 static void read_uint8(uint8** buffer, uint8* ui8) {
@@ -168,6 +178,7 @@ static void read_player_input(uint8** buffer, Player::PlayerInput* input) {
     read_float32(buffer, &input->pitch);
 };
 
+// Not used.
 static void read_player_input_verbose(uint8** buffer, Player::PlayerInput* input) {
     read_uint8(buffer, &input->forward);
     read_uint8(buffer, &input->backward);
@@ -187,6 +198,12 @@ static void read_player_state(uint8** buffer, Player::PlayerState* ps) {
     read_vec3f(buffer, &ps->velocity);
     read_float32(buffer, &ps->yaw);
     read_float32(buffer, &ps->pitch);
+};
+
+
+static void read_object(uint8** buffer, Object* obj) {
+    read_uint32(buffer, &obj->id);
+    read_vec3f(buffer, &obj->position);
 };
 
 }

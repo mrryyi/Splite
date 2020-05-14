@@ -43,6 +43,8 @@ constexpr float32 gravitation_y_per_millisecond = 0.003;
 constexpr float32 player_width = 10.0;
 constexpr float32 player_height = 10.0;
 
+constexpr float32 player_eat_cube_distance = 10.0f;
+
 constexpr float32 window_coord_width = 1000;
 constexpr float32 window_coord_height = 1000;
 

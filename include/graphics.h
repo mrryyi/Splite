@@ -1,6 +1,7 @@
 #pragma once
 #include "pre.h"
 #include "game.h"
+#include "object.h"
 
 // Graphics
 #include "shader.h"
@@ -16,50 +17,6 @@
 
 namespace graphics
 {
-
-class Rect {
-public:
-    float32 x_start = 0.0;
-    float32 y_start = 0.0;
-    float32 x_end = 0.0;
-    float32 y_end = 0.0;
-    Rect(const float32 x1, const float32 y1, const float32 x2, const float32 y2)
-    {
-        x_start = x1;
-        y_start = y1;
-        x_end = x2;
-        y_end = y2;
-    };
-
-    Rect() {};
-
-    void scale(const float32 scale) {
-        x_end *= scale;
-        y_end *= scale;
-    };
-
-    void render( bool8 state_got ) {
-    };
-    
-};
-
-
-class Rect_w : public Rect {
-public:
-    float32 width = 1.0;
-    float32 height = 1.0;
-
-    Rect_w(){};
-    Rect_w(const float32 x, const float32 y, const float32 width, const float32 height) {
-        this->width = width;
-        this->height = height;
-        x_start = x;
-        y_start = y;
-        x_end = x_start + width;
-        y_end = y_start + height;
-    };
-};
-
 
 class GraphicsHandle {
 public:
@@ -271,8 +228,6 @@ public:
         ourShader.setVec3f("lightColor", 1.0f, 0.5f, 1.0f);
         ourShader.setVec3f("objectColor", 1.0f, 0.5f, 0.31f);
 
-
-
         // Light source
 
         // set up vertex data (and buffer(s)) and configure vertex attributes
@@ -337,7 +292,7 @@ public:
     }
 
     // Updates graphics.
-    FRESULT Update( bool8 state_got, float32 delta_time_ms ) {
+    FRESULT Update( float32 delta_time_ms ) {
 
         uint64 time_started_render = timeSinceEpochMillisec();
         printf("Start render.\n");
@@ -355,9 +310,10 @@ public:
             // Get COPY of player states as constant as we will not alter the player states.
             std::vector<Player::PlayerState> player_states;
             player_states = scene->get_player_states();
-            printf("player_state size: %d\n", player_states.size());
             uint32 local_i = scene->m_local_player_state_i;
-            
+            std::vector<Object> objects;
+            objects = scene->get_objects();
+
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
@@ -380,14 +336,15 @@ public:
 
             glBindVertexArray(VAOs[0]);
 
-            for(unsigned int i = 0; i < 10; i++) {
+            for(unsigned int i = 0; i < objects.size(); i++) {
                     
                 // calculate the model matrix for each object and pass it to shader before drawing
                 glm::mat4 model = glm::mat4(1.0f);
                 float32 angle = 20.f * i + 20.f;
-                model = glm::translate(model, cubePositions[i]);
-                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-                model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                model = glm::translate(model, objects[i].position);
+                angle *= (float32) glfwGetTime();
+                model = glm::rotate(model, glm::radians( angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                model = glm::rotate(model, glm::radians( angle), glm::vec3(1.0f, 0.3f, 0.5f));
                 ourShader.setMat4f("model", model);
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -418,20 +375,6 @@ public:
                     glDrawArrays(GL_TRIANGLES, 0, 36);
                 }
             }
-
-            
-
-            /*
-
-            if ( history_mode_on ) {
-
-                // TODO: fix render_players_with_history.
-                //render_players_with_history( player_states, local_id, state_got );
-                render_players( player_states, local_id, state_got );
-            }
-            else {
-                render_players( player_states, local_id, state_got );
-            }*/
             
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -443,15 +386,6 @@ public:
         printf("Render time: %d ms.\n", time_took);
 
         return FRESULT(FR_OK);
-    }
-    
-    void history_mode_toggle() {
-        history_mode_on = !history_mode_on;
-
-        if ( !history_mode_on ) {
-            // Luckily std::map destructs any comp
-            player_positions.clear();
-        }
     }
 
     struct vector3f {
@@ -486,40 +420,6 @@ public:
             }
         }
 
-    }
-
-    void render_players_with_history(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
-
-        for(int i = 0; i < player_states.size(); i++) {
-
-            uint32 player_id = player_states[i]->id;
-
-            if (player_id != local_id ) {
-
-                // Add player to history map.
-                if ( player_positions.count( player_id ) < 1 ) {
-                    history_pos hpos;
-                    //player_positions.insert( std::pair<uint32, history_pos>(player_id, hpos) );
-                }
-
-                if ( player_positions.count( player_id )) {
-
-                    // Add new position to history
-                    //player_positions[player_id].push_back( client_history_pos{ { player_states[i]->x, player_states[i]->y }, state_got } );
-
-                    // Delete oldest history pos.
-                    if ( player_positions[player_id].size() > max_history_len ) {
-                        player_positions[player_id].erase( player_positions[player_id].begin() );
-                    }
-                }
-
-                // Draw history.
-                for( auto const& pos : player_positions[ player_id ]) {
-                    Rect_w rect = Rect_w(pos.x, pos.y, player_width, player_height);
-                    rect.render( pos.state_got );
-                }
-            }
-        }
     }
 
 };

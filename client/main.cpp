@@ -163,16 +163,11 @@ int main() {
                 switch ( (Network::ServerMessageType) r_Msg.buffer[0] ) {
                     case Network::ServerMessageType::RegisterSyn:
                     {
-                        
-                        //if ( id_from_server == NO_ID_GIVEN ) {
-                            printf("Handshaking...\n");
-                            Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
-                            Network::Message s_Msg;
-                            msg_size = Network::client_msg_ack_write( s_Msg.buffer, id_from_server );
-                            Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
-                        //else {
-                        //    printf("Server tried to register syn, but ID is present.");
-                        //}
+                        printf("Handshaking...\n");
+                        Network::server_msg_syn_read( r_Msg.buffer, &id_from_server );
+                        Network::Message s_Msg;
+                        msg_size = Network::client_msg_ack_write( s_Msg.buffer, id_from_server );
+                        Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
 
                     }
                     break;
@@ -182,20 +177,15 @@ int main() {
                         uint8 ye_nah;
                         Network::server_msg_register_result_read( r_Msg.buffer, &ye_nah );
                         
-                        //if ( (id_from_server == NO_ID_GIVEN) && !connected ) {
-                            if ( ye_nah ) {
-                                printf("Connected...\n");
-                                connected = true;
-                            }
-                            else {
-                                printf("Rejected :/\n");
-                                id_from_server = NO_ID_GIVEN;
-                                connected = false;
-                            }
-                        //}
-                        //else {
-                        //    printf("Server tried to register result, but ID is present.");
-                        //}
+                        if ( ye_nah ) {
+                            printf("Connected...\n");
+                            connected = true;
+                        }
+                        else {
+                            printf("Rejected :/\n");
+                            id_from_server = NO_ID_GIVEN;
+                            connected = false;
+                        }
 
                     }
                     break;
@@ -212,13 +202,10 @@ int main() {
                     case Network::ServerMessageType::PlayerStates:
                     {
 
-                        state_got_this_tick = true;
-
                         uint64 tick;
                         mainScene.clear_player_states();
                         Network::server_msg_player_states_read( r_Msg.buffer, &mainScene.m_player_states, &tick );
 
-                        printf("Server tick: %d\n", tick);
                         for(int i = 0; i < mainScene.m_player_states.size(); i++) {
                             if (mainScene.m_player_states[i].id == id_from_server) {
                                 // Copy
@@ -228,6 +215,14 @@ int main() {
                             }
                         }
                     
+                    }
+                    break;
+                    case Network::ServerMessageType::Objects:
+                    {
+                        uint64 tick;
+                        mainScene.clear_objects();
+                        Network::server_msg_objects_read( r_Msg.buffer, &mainScene.m_objects, &tick );
+                        
                     }
                     break;
                     case Network::ServerMessageType::Kicked:
@@ -255,7 +250,6 @@ int main() {
 
         now = timeSinceEpochMillisec();
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;
-        //printf("time heard from server ms: %d", time_since_heard_from_server_ms);
         
         if ( (time_since_heard_from_server_ms > 5000 ) && connected ) {
             printf("Not connected anymore.");
@@ -264,7 +258,6 @@ int main() {
             mainScene.became_offline();
             local_player_state_i = 0;
         }
-        //printf("[Connected: { %d }]\n", connected);
 
         if ( connected != true ) {
             now = timeSinceEpochMillisec();
@@ -289,7 +282,7 @@ int main() {
             // If input is new, send new input.
             if ( old_input != input ) {
                 Network::Message s_Msg;
-                msg_size = Network::client_msg_input_write( s_Msg.buffer, id_from_server, timeSinceEpochMillisec(), input );
+                msg_size = Network::client_msg_input_write( s_Msg.buffer, id_from_server, input );
                 Network::send_msg( &sock, s_Msg, msg_size, server_address );
             }
 
@@ -299,16 +292,7 @@ int main() {
         mainScene.inform_camera( &camera );
 
         graphics_handle.camera = camera;
-
-        now = timeSinceEpochMillisec();
-        // Toggle history mode by button release.
-        bool8 hmt_pressed_now = (bool8) glfwGetKey( graphics_handle.window, GLFW_KEY_H );
-        if (  (!hmt_pressed_last_tick && hmt_pressed_now) ) {
-            graphics_handle.history_mode_toggle();
-        }
-        hmt_pressed_last_tick = hmt_pressed_now;
-
-        graphics_handle.Update( state_got_this_tick, local_milliseconds_per_tick );
+        graphics_handle.Update( local_milliseconds_per_tick );
 
     }
 

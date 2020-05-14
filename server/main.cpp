@@ -12,6 +12,7 @@ int main() {
     
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
+    Game::ServerScene mainScene;
 
     // We create a WSADATA object called wsaData.
     WSADATA wsaData;
@@ -76,6 +77,13 @@ int main() {
     Timer_ms::timer_start();
 
     uint32 msg_size;
+
+    for(uint32 i = 0; i < 50; i++) {
+        Object obj;
+        obj.id = i;
+        obj.position = {i, 0, i};
+        mainScene.add_object(obj);
+    }
 
     while ( running ) {
         while( Timer_ms::timer_get_ms_since_start() < server_milliseconds_per_tick) {
@@ -147,9 +155,8 @@ int main() {
                     {
                         
                         uint32 id;
-                        uint64 timestamp_ms;
                         Player::PlayerInput player_input;
-                        Network::client_msg_input_read( r_Msg.buffer, &id, &timestamp_ms, &player_input );
+                        Network::client_msg_input_read( r_Msg.buffer, &id, &player_input );
                         
                         if( clients.count( id ) > 0 ) {
                             uint64 time_now = timeSinceEpochMillisec();
@@ -213,21 +220,28 @@ int main() {
 
         if( clients.size() > 0 )
         {
-
-            std::vector<Player::PlayerState> player_states;
+            
+            // Make sure to clean the slate and only use
+            // connected clients.
+            mainScene.clear_player_states();
 
             for( auto const& cli : clients ) {
                 
                 // Tick player movement.
-                Player::tick_player_by_input( cli.second->player_state, cli.second->input, server_milliseconds_per_tick );
-
-                // 
-                player_states.push_back(cli.second->player_state);
+                mainScene.tick_player( cli.second->player_state, cli.second->input, server_milliseconds_per_tick );
+                mainScene.add_player_state( cli.second->player_state );
 
             };
 
             Network::Message s_Msg;
-            msg_size = Network::server_msg_player_states_write( s_Msg.buffer, player_states, tick);
+            msg_size = Network::server_msg_player_states_write( s_Msg.buffer, mainScene.get_player_states(), tick);
+
+            for( auto const& cli : clients ) {
+                printf("Sending playerstate to client %d\n", cli.second->unique_id);
+                Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
+            }
+
+            msg_size = Network::server_msg_objects_write( s_Msg.buffer, mainScene.get_objects(), tick);
 
             for( auto const& cli : clients ) {
                 printf("Sending playerstate to client %d\n", cli.second->unique_id);

@@ -8,6 +8,7 @@
 namespace Network
 {
 
+// Client messages.
 
 uint32 client_msg_register_write( uint8* buffer) {
     uint8* iterator = buffer;
@@ -74,8 +75,27 @@ void client_msg_connection_read( uint8* buffer, uint32* id) {
     read_uint32(&iterator, id);
 };
 
+uint32 client_msg_input_write( uint8* buffer, uint32 id, Player::PlayerInput input ) {
+    uint8* iterator = buffer;
+    write_uint8(&iterator, (uint8) ClientMessageType::Input);
+    write_uint32(&iterator, id);
+    write_player_input(&iterator, &input);
 
+    return (uint32)(iterator - buffer);
+};
 
+void client_msg_input_read( uint8* buffer, uint32* id, Player::PlayerInput* input ) {
+    uint8* iterator = buffer;
+    uint8 message_type;
+    read_uint8(&iterator, &message_type);
+    assert(message_type == (uint8) ClientMessageType::Input);
+    
+    read_uint32(&iterator, id);
+    read_player_input(&iterator, input);
+
+};
+
+// Server messages.
 
 uint32 server_msg_syn_write( uint8* buffer, uint32 id ) {
     uint8* iterator = buffer;
@@ -132,10 +152,6 @@ uint32 server_msg_connection_write( uint8* buffer ) {
     return (uint8)(iterator - buffer);
 };
 
-
-
-
-
 uint32 server_msg_player_states_write( uint8* buffer, std::vector<Player::PlayerState> player_states, uint64 tick ) {
     assert(player_states.size() > 0);
      
@@ -176,33 +192,41 @@ void server_msg_player_states_read( uint8* buffer, std::vector<Player::PlayerSta
     
 };
 
-
-
-
-
-
-uint32 client_msg_input_write( uint8* buffer, uint32 id, uint64 timestamp_ms, Player::PlayerInput input ) {
+uint32 server_msg_objects_write( uint8* buffer, std::vector<Object> objects, uint64 tick) {
     uint8* iterator = buffer;
-    write_uint8(&iterator, (uint8) ClientMessageType::Input);
-    write_uint32(&iterator, id);
-    write_uint64(&iterator, timestamp_ms);
-    write_player_input(&iterator, &input);
 
-    return (uint32)(iterator - buffer);
-};
+    write_uint8( &iterator, (uint8) ServerMessageType::Objects );
+    write_uint64( &iterator, tick );
 
-void client_msg_input_read( uint8* buffer, uint32* id, uint64* timestamp_ms, Player::PlayerInput* input ) {
-    uint8* iterator = buffer;
-    uint8 message_type;
-    read_uint8(&iterator, &message_type);
-    assert(message_type == (uint8) ClientMessageType::Input);
+    uint8 num_objects = objects.size();
+
+    write_uint8( &iterator, num_objects );
+
+    for( auto const& object : objects ) {
+        write_object( &iterator, &object );
+    }
     
-    read_uint32(&iterator, id);
-    read_uint64(&iterator, timestamp_ms);
-    read_player_input(&iterator, input);
+    return (uint32)(iterator - buffer);
+}
 
-};
+void server_msg_objects_read( uint8* buffer, std::vector<Object>* objects, uint64* tick) {
+    uint8* iterator = buffer;
+    
+    uint8 message_type;
+    read_uint8( &iterator, &message_type );
+    assert( message_type == (uint8) ServerMessageType::Objects );
+    read_uint64( &iterator, tick);
 
+    uint8 num_objects;
+    read_uint8( &iterator, &num_objects);
+
+    for( uint8 i = 0; i < num_objects; i++) {
+        Object obj = Object();
+        read_object( &iterator, &obj );
+        objects->push_back( obj );
+    }
+
+}
 
 
 

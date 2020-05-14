@@ -32,7 +32,6 @@ struct PlayerInput
         left = p.left;
         right = p.right;
         jump = p.jump;
-
         yaw = p.yaw;
         pitch = p.pitch;
     };

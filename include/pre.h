@@ -10,6 +10,7 @@
 #include "sperror.h"
 #include "player.h"
 #include "game.h"
+#include "object.h"
 
 uint64 timeSinceEpochMillisec() {
   using namespace std::chrono;

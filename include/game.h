@@ -2,6 +2,7 @@
 
 #include "pre.h"
 #include <vector>
+#include "object.h"
 #include "camera.h"
 #include "glm/glm.hpp"
 #include <mutex>
@@ -15,18 +16,28 @@ class Scene {
 public:
 
     std::vector<Player::PlayerState> m_player_states;
+    std::vector<Object> m_objects;
 
     const std::vector<Player::PlayerState>& get_player_states() const {
         return m_player_states;
+    };
+
+    const std::vector<Object>& get_objects() const {
+        return m_objects;
     };
 
     void clear_player_states() {
         m_player_states.clear();
     };
 
+    void clear_objects() {
+        m_objects.clear();
+    };
+
     void add_player_state( Player::PlayerState new_player ) {
         m_player_states.push_back( new_player );
     };
+
     void set_player_states( std::vector<Player::PlayerState> p_states ) {
         m_player_states.clear();
         m_player_states = p_states;
@@ -46,6 +57,31 @@ public:
             m_player_states.erase( m_player_states.begin() + index_to_remove );
         }
     };
+
+    void add_object( Object new_object) {
+        m_objects.push_back( new_object );
+    };
+
+    void set_objects( std::vector<Object> p_objects ) {
+        m_objects.clear();
+        m_objects = p_objects;
+    };
+
+    void remove_object( uint32 object_id ) {
+        uint32 index_to_remove = -1;
+
+        for( uint32 i = 0; i < m_objects.size(); i++ ) {
+            if ( m_objects[i].id == object_id ) {
+                index_to_remove = i;
+                break;
+            }
+        }
+
+        if (index_to_remove != -1) {
+            m_objects.erase( m_objects.begin() + index_to_remove );
+        }
+    };
+
 
     void tick_player_by_physics( PlayerState &player_state, float32 delta_time_ms ) {
 
@@ -135,6 +171,34 @@ public:
 
     };
 
+};
+
+class ServerScene : public Scene {
+public:
+
+    void tick_player_object_interaction( PlayerState &player_state ) {
+
+        float32 distance;
+
+        std::vector<int32> indexes_to_remove;
+
+        for( uint32 i = 0; i < m_objects.size(); i++ ) {
+            distance = glm::distance( m_objects[i].position, player_state.position);
+            if ( distance < player_eat_cube_distance ) {
+                indexes_to_remove.push_back( i );
+            }
+        }
+
+        for ( auto const& index : indexes_to_remove) {
+            m_objects.erase( m_objects.begin() + index);
+        }
+
+    }
+
+    void tick_player( PlayerState &player_state, PlayerInput &player_input, float32 delta_time_ms ) {
+        tick_player_by_input(player_state, player_input, delta_time_ms);
+        tick_player_object_interaction( player_state );
+    }
 };
 
 
