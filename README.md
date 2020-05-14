@@ -2,7 +2,9 @@
 # C++ OpenGL UDP Multiplayer
 
 ## Requirements
-* Windows
+* Windows 64-bit.
+* Bunch of g++ stuff
+* Mingw 64-bit or other compiler you like.
 
 ## Dependencies to build
 * GLFW windows binaries and headers for compiler of choice.
