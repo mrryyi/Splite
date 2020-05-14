@@ -5,13 +5,30 @@
 #include <glad/glad.h>
 #include "..\include\input.h"
 #include "..\include\graphics.h"
-#include <mutex>
 
 #pragma comment(lib, "Ws2_32.lib")
 
 #define PORT_SERVER 1234
 
-int main() {
+int main( int argc, char** argv ) {
+
+
+    printf("Program Started: %s\n", argv[0]); 
+
+    std::string inet_address = "127.0.0.1";
+
+    // Here you can connect to different IPs than the default local.
+    if( argc >= 2 ) {
+
+        if ( Network::is_valid_ip( argv[1] )) {
+            inet_address = argv[1];
+        }
+        else {
+            printf("Not valid IP: %s\n", inet_address.c_str() );
+        }
+    }
+
+    printf("Attempting to connect to server: %s\n", inet_address.c_str() );
 
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -45,7 +62,6 @@ int main() {
     }
 
     glViewport(0, 0, window_coord_width, window_coord_height);
-
 
     graphics_handle.init();
     
@@ -99,7 +115,7 @@ int main() {
     SOCKADDR_IN server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons( PORT_SERVER );
-    server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1" );
+    server_address.sin_addr.S_un.S_addr = inet_addr( inet_address.c_str() );
 
     int32 userInput;
     Player::PlayerInput input;
