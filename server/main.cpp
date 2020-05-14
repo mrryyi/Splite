@@ -66,8 +66,6 @@ int main() {
     SOCKADDR_IN from;
     int from_size = sizeof( from );
     
-    printf("[Server started.]\n[Listening...]\n");
-
     uint64 now;
     uint64 last_check;
     uint64 tick = 0;
@@ -81,9 +79,11 @@ int main() {
     for(uint32 i = 0; i < 50; i++) {
         Object obj;
         obj.id = i;
-        obj.position = {i, 0, i};
+        obj.position = { rand() % 100, 0, rand() % 100 };
         mainScene.add_object(obj);
     }
+    
+    printf("[Server started.]\n[Listening...]\n");
 
     while ( running ) {
         while( Timer_ms::timer_get_ms_since_start() < server_milliseconds_per_tick) {
@@ -170,6 +170,7 @@ int main() {
                             Network::send_msg( &sock, s_Msg, msg_size, r_Msg.address );
                         }
                     }
+                    break;
                     default:
                     {
                         printf("Invalid message received.\n");
@@ -218,8 +219,7 @@ int main() {
 
         }
 
-        if( clients.size() > 0 )
-        {
+        if( clients.size() > 0 ) {
             
             // Make sure to clean the slate and only use
             // connected clients.
@@ -237,20 +237,49 @@ int main() {
             msg_size = Network::server_msg_player_states_write( s_Msg.buffer, mainScene.get_player_states(), tick);
 
             for( auto const& cli : clients ) {
-                printf("Sending playerstate to client %d\n", cli.second->unique_id);
+                //printf("Sending playerstate to client %d\n", cli.second->unique_id);
                 Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
             }
+
+            if ( mainScene.get_objects().size() == 0) {
+                uint32 ID = NO_ID_GIVEN;
+                uint32 score = 0;
+                for(auto const& player : mainScene.get_player_states()) {
+                    // In cases of ties, unfortunately, the player with lowest ID will win.
+                    if ( player.score > score ) {
+                        ID = player.id;
+                        score = player.score;
+                    }
+                }
+
+                if ( ID != NO_ID_GIVEN) {
+                    msg_size = Network::server_msg_winner_write( s_Msg.buffer, ID);
+                    for( auto const& cli : clients ) {
+                        //printf("Sending playerstate to client %d\n", cli.second->unique_id);
+                        Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
+                        // Reset score.
+                        cli.second->player_state.score = 0;
+                    }
+                }
+
+                for(uint32 i = 0; i < 50; i++) {
+                    Object obj;
+                    obj.id = i;
+                    obj.position = { rand() % 100, 0, rand() % 100 };
+                    mainScene.add_object(obj);
+                }
+
+            };
 
             msg_size = Network::server_msg_objects_write( s_Msg.buffer, mainScene.get_objects(), tick);
 
             for( auto const& cli : clients ) {
-                printf("Sending playerstate to client %d\n", cli.second->unique_id);
+                //printf("Sending playerstate to client %d\n", cli.second->unique_id);
                 Network::send_msg( &sock, s_Msg, msg_size, cli.second->address );
             }
 
-        }
+        } // End if clients
 
-        tick++;
     } // End while running
     
     printf("Exiting program normally...");

@@ -10,6 +10,10 @@
 #include <GLFW/glfw3.h>
 #include "camera.h"
 
+// Font
+//#include <ft2build.h>
+//#include FT_FREETYPE_H
+
 // GL math
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -69,6 +73,7 @@ public:
     Shader lightsourceShader;
 
     Camera camera;
+    //FTLibrary ft_library;
     Game::LocalScene* scene;
     std::mutex* scene_update_mutex;
     
@@ -82,13 +87,8 @@ public:
 
     glm::vec3 lightPos = glm::vec3( 1.2f, 1.0f, -10.0f );
 
-    // world space positions of our cubes
-    std::vector<glm::vec3> cubePositions;
 
     GraphicsHandle() {
-        
-        //meshCube.load_from_object_file("../obj/teapot_minusz.obj");
-        
     }
 
     ~GraphicsHandle() {
@@ -102,6 +102,11 @@ public:
     void init() {
 
         camera = Camera(glm::vec3(0.0f, 0.0f, 3.0f));
+
+        /*auto error = TF_Init_FreeType( &ft_library );
+        if (error) {
+            printf("Error loading freetype.\n");
+        }*/
 
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         
@@ -168,17 +173,6 @@ public:
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
         };
-        
-        cubePositions.push_back( glm::vec3( 0.0f,  0.0f,  0.0f) );
-        cubePositions.push_back( glm::vec3( 2.0f,  5.0f, -15.0f) );
-        cubePositions.push_back( glm::vec3(-1.5f, -2.2f, -2.5f) );
-        cubePositions.push_back( glm::vec3(-3.8f, -2.0f, -12.3f) );
-        cubePositions.push_back( glm::vec3( 2.4f, -0.4f, -3.5f) );
-        cubePositions.push_back( glm::vec3(-1.7f,  3.0f, -7.5f) );
-        cubePositions.push_back( glm::vec3( 1.3f, -2.0f, -2.5f) );
-        cubePositions.push_back( glm::vec3( 1.5f,  2.0f, -2.5f) );
-        cubePositions.push_back( glm::vec3( 1.5f,  0.2f, -1.5f) );
-        cubePositions.push_back( glm::vec3(-1.3f,  1.0f, -1.5f) );
 
         glGenBuffers( 2, VBOs );
         glGenVertexArrays( 2, VAOs );
@@ -225,7 +219,7 @@ public:
         // tell opengl for each sampler to which texture unit it belongs to (only has to be done once)
         // -------------------------------------------------------------------------------------------
         ourShader.use();
-        ourShader.setVec3f("lightColor", 1.0f, 0.5f, 1.0f);
+        ourShader.setVec3f("lightColor", 1.0f, 1.0f, 1.0f);
         ourShader.setVec3f("objectColor", 1.0f, 0.5f, 0.31f);
 
         // Light source
@@ -295,15 +289,29 @@ public:
     FRESULT Update( float32 delta_time_ms ) {
 
         uint64 time_started_render = timeSinceEpochMillisec();
-        printf("Start render.\n");
+        //printf("Start render.\n");
         
         if ( !window ) {
             return FRESULT(FR_FAILURE);
         }
         else {
             
+            glm::vec3 gl_clear_color = { 1.0f, 1.0f, 1.0f };
+
+            if ( is_won_animating( delta_time_ms ) ) {
+                gl_clear_color = { won_animation_time_curr / 3000,
+                                   won_animation_time_curr / 2000,
+                                   won_animation_time_curr / 1000 };
+            };
+
+            if ( is_lost_animating( delta_time_ms ) ) {
+                gl_clear_color = { won_animation_time_curr / 3000,
+                                   won_animation_time_curr / 3000,
+                                   won_animation_time_curr / 3000 };
+            };
+
             // state-setting function
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClearColor(gl_clear_color.x, gl_clear_color.y, gl_clear_color.z, 1.0f);
             // state-using function
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             
@@ -317,7 +325,7 @@ public:
             // create transformations
             glm::mat4 view          = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
             glm::mat4 projection    = glm::mat4(1.0f);
-            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 100.0f);
+            projection = glm::perspective(glm::radians(90.0f), (float32)window_coord_width / (float32)window_coord_height, 0.1f, 1000.0f);
             
             view = camera.GetViewMatrix();
 
@@ -336,6 +344,8 @@ public:
 
             glBindVertexArray(VAOs[0]);
 
+            ourShader.setVec3f("objectColor", 0.3f, 0.3f, 0.3f);
+
             for(unsigned int i = 0; i < objects.size(); i++) {
                     
                 // calculate the model matrix for each object and pass it to shader before drawing
@@ -343,8 +353,9 @@ public:
                 float32 angle = 20.f * i + 20.f;
                 model = glm::translate(model, objects[i].position);
                 angle *= (float32) glfwGetTime();
-                model = glm::rotate(model, glm::radians( angle), glm::vec3(1.0f, 0.3f, 0.5f));
-                model = glm::rotate(model, glm::radians( angle), glm::vec3(1.0f, 0.3f, 0.5f));
+                
+                model = glm::rotate(model, glm::radians( angle ), glm::vec3(1.0f, 0.3f, 0.5f));
+                model = glm::rotate(model, glm::radians( angle ), glm::vec3(1.0f, 0.3f, 0.5f));
                 ourShader.setMat4f("model", model);
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -364,6 +375,7 @@ public:
             // Draw players
             glBindVertexArray(VAOs[0]);
             ourShader.use();
+            ourShader.setVec3f("objectColor", 1.0f, 0.5f, 0.31f);
 
             for( uint32 i = 0; i < player_states.size(); i++ ) {
                 if ( i != local_i ) {
@@ -383,44 +395,58 @@ public:
         uint64 now = timeSinceEpochMillisec();
         uint64 time_took = now - time_started_render;
         
-        printf("Render time: %d ms.\n", time_took);
+        //printf("Render time: %d ms.\n", time_took);
 
         return FRESULT(FR_OK);
     }
 
-    struct vector3f {
-        float32 x, y, z;
+    const float32 won_animation_max_time = 3000.0f;
+    float32 won_animation_time_curr = 0.0f;
+    bool won_animating = false;
+
+    void won() {
+        won_animation_time_curr = 0.0f;
+        won_animating = true;
     };
 
-    struct client_history_pos : vector3f {
-        bool8 state_got;
-    };
-
-    using history_pos = std::vector<client_history_pos>;
-
-    std::map<uint32, history_pos> player_positions;
-
-    bool8 history_mode_on = true;
-    size_t max_history_len = 100;
-    
-    void render_player(Player::PlayerState* ps, bool8 state_got) {
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, ps->position);
-        model = glm::rotate(model, glm::radians(ps->yaw), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(ps->pitch), glm::vec3(0.0f, 1.0f, 0.0f));
-        ourShader.setMat4f("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-
-    void render_players(std::vector<Player::PlayerState*>& player_states, uint32 local_id, bool8 state_got) {
-
-        for( size_t i = 0; i < player_states.size(); i++) {
-            if ( player_states[i]->id != local_id ) {
-                render_player(player_states[i], state_got);
+    bool is_won_animating( float32 delta_time_ms ) {
+        if (won_animating) {
+            if ( won_animation_time_curr < won_animation_max_time ) {
+                won_animation_time_curr += delta_time_ms;
+                return true;
             }
+            else {
+                won_animation_time_curr = 0.0f;
+                won_animating = false;
+                return false;
+            }  
         }
+    };
 
-    }
+    const float32 lost_animation_max_time = 3000.0f;
+    float32 lost_animation_time_curr = 0.0f;
+    bool lost_animating = false;
+
+    void lost() {
+        lost_animation_time_curr = 0.0f;
+        lost_animating = true;
+    };
+
+    bool is_lost_animating( float32 delta_time_ms ) {
+
+        if (lost_animating) {
+            if ( lost_animation_time_curr < lost_animation_max_time ) {
+                lost_animation_time_curr += delta_time_ms;
+                return true;
+            }
+            else {
+                lost_animation_time_curr = 0.0f;
+                lost_animating = false;
+                return false;
+            }  
+        }
+        
+    };
 
 };
 

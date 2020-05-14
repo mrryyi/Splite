@@ -186,6 +186,8 @@ public:
             distance = glm::distance( m_objects[i].position, player_state.position);
             if ( distance < player_eat_cube_distance ) {
                 indexes_to_remove.push_back( i );
+
+                player_state.score += 1;
             }
         }
 

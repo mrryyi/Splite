@@ -146,7 +146,6 @@ int main() {
         
         bool8 state_got_this_tick = false;
 
-        printf("New tick.\n");
 
         while ( Timer_ms::timer_get_ms_since_start() < local_milliseconds_per_tick) {
             int bytes_received = recvfrom( sock, buffer, SOCKET_BUFFER_SIZE, flags, (SOCKADDR*)&from, &from_size );
@@ -219,10 +218,25 @@ int main() {
                     break;
                     case Network::ServerMessageType::Objects:
                     {
+
                         uint64 tick;
                         mainScene.clear_objects();
                         Network::server_msg_objects_read( r_Msg.buffer, &mainScene.m_objects, &tick );
                         
+                    }
+                    break;
+                    case Network::ServerMessageType::Winner:
+                    {
+                        uint32 ID;
+                        Network::server_msg_winner_read( r_Msg.buffer, &ID );
+                        if ( ID == id_from_server ) {
+                            graphics_handle.won();
+                            printf("I WON.");
+                        }
+                        else {
+                            graphics_handle.lost();
+                            printf("I LOST.");
+                        }
                     }
                     break;
                     case Network::ServerMessageType::Kicked:
@@ -247,6 +261,7 @@ int main() {
         } // End while timer not reached ms per tick
 
         Timer_ms::timer_start();
+        //printf("New tick.\n");
 
         now = timeSinceEpochMillisec();
         time_since_heard_from_server_ms = now - last_heard_from_server_ms;

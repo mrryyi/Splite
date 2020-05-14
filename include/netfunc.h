@@ -105,6 +105,7 @@ static void write_player_state(uint8** buffer, const Player::PlayerState* ps) {
     write_vec3f(buffer, ps->velocity);
     write_float32(buffer, ps->yaw);
     write_float32(buffer, ps->pitch);
+    write_uint32(buffer, ps->score);
 };
 
 static void write_object(uint8** buffer, const Object* obj) {
@@ -198,6 +199,7 @@ static void read_player_state(uint8** buffer, Player::PlayerState* ps) {
     read_vec3f(buffer, &ps->velocity);
     read_float32(buffer, &ps->yaw);
     read_float32(buffer, &ps->pitch);
+    read_uint32(buffer, &ps->score);
 };
 
 

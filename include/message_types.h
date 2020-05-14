@@ -27,7 +27,8 @@ enum ServerMessageType : uint8 {
     GameState,
     Kicked,
     PlayerStates,
-    Objects
+    Objects,
+    Winner
 };
 
 const char *SrvMsgNames[] = {"NoMessage",
@@ -37,6 +38,7 @@ const char *SrvMsgNames[] = {"NoMessage",
                              "GameState",
                              "Kicked",
                              "PlayerStates",
-                             "Objects"};
+                             "Objects",
+                             "Winner"};
 
 }

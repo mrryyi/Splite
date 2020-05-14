@@ -207,7 +207,7 @@ uint32 server_msg_objects_write( uint8* buffer, std::vector<Object> objects, uin
     }
     
     return (uint32)(iterator - buffer);
-}
+};
 
 void server_msg_objects_read( uint8* buffer, std::vector<Object>* objects, uint64* tick) {
     uint8* iterator = buffer;
@@ -226,8 +226,22 @@ void server_msg_objects_read( uint8* buffer, std::vector<Object>* objects, uint6
         objects->push_back( obj );
     }
 
-}
+};
 
+uint32 server_msg_winner_write( uint8* buffer, uint32 ID ) {
+    uint8* iterator = buffer;
+    write_uint8( &iterator, (uint8) ServerMessageType::Winner );
+    write_uint32( &iterator, ID);
 
+    return (uint32) (iterator - buffer);
+};
+
+void server_msg_winner_read( uint8* buffer, uint32* ID) {
+    uint8* iterator = buffer;
+    uint8 message_type;
+    read_uint8( &iterator, &message_type );
+    assert( message_type == (uint8) ServerMessageType::Winner );
+    read_uint32( &iterator, ID );
+};
 
 }

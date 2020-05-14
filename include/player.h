@@ -60,6 +60,7 @@ public:
     glm::vec3 velocity;
     float32 yaw = 0.0f;
     float32 pitch = 0.0f;
+    uint32 score = 0;
 
     PlayerState(uint32 id, glm::vec3 position, glm::vec3 velocity )
     : id(id), position(position), velocity(velocity) {
