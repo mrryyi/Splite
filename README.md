@@ -9,3 +9,5 @@
 ## Dependencies to build
 * GLFW windows binaries and headers for compiler of choice.
 * GLAD [Get started.](https://learnopengl.com/Getting-started/Creating-a-window)
+
+## Not a lot of comments for a reason: explanatory variable and function names instead.
