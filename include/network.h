@@ -20,10 +20,6 @@ public:
     int32 bufferLength;
     int bytesReceived = SOCKET_ERROR;
 
-    // Supposed to be set when received, as to not 
-    // calculate the time it was received after too
-    // many operations have been performed, increasing
-    // the supposed lag.
     int64 timestamp_received_ms;
 
     void SetAddress(SOCKADDR_IN address) {

@@ -421,6 +421,9 @@ public:
                 return false;
             }  
         }
+        else {
+            return false;
+        }
     };
 
     const float32 lost_animation_max_time = 3000.0f;
@@ -444,6 +447,9 @@ public:
                 lost_animating = false;
                 return false;
             }  
+        }
+        else {
+            return false;
         }
         
     };

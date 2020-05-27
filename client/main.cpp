@@ -28,8 +28,6 @@ int main( int argc, char** argv ) {
         }
     }
 
-    printf("Attempting to connect to server: %s\n", inet_address.c_str() );
-
     // Forces stdout to be line-buffered.
     setvbuf(stdout, NULL, _IONBF, 0);
     FRESULT fr;
@@ -115,7 +113,9 @@ int main( int argc, char** argv ) {
     SOCKADDR_IN server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons( PORT_SERVER );
-    server_address.sin_addr.S_un.S_addr = inet_addr( inet_address.c_str() );
+    server_address.sin_addr.S_un.S_addr = inet_addr( "127.0.0.1"/*inet_address.c_str()*/ );
+    
+    printf("Attempting to connect to server: %s\n", inet_address.c_str() );
 
     int32 userInput;
     Player::PlayerInput input;

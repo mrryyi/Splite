@@ -1,6 +1,6 @@
 
 
-CXX = g++ -lstdc++ -std=c++17
+CXX = g++ -static -static-libgcc -static-libstdc++ -std=c++17
 CC = gcc
 COMPILE_FLAGS = -c
 LIBRARIES = 
