@@ -3,6 +3,8 @@
 
 [![Splite video demo](https://img.youtube.com/vi/TvP0nv-aeHw/0.jpg)](https://www.youtube.com/watch?v=TvP0nv-aeHw "Video demo")
 
+## I strongly recommend reading REPORT 2020-05-24.pdf
+
 ## Requirements
 * Windows 64-bit.
 * Bunch of g++ stuff
